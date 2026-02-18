@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { ScriptLine, SessionConfig, RehearsalState } from '../types';
 import { getDialogueLines, isMyLine, isOtherLine, isDirection } from '../lib/rehearsalEngine';
+import { speakWithElevenLabs } from '../lib/elevenLabsEngine';
 import { useTTS } from './useTTS';
 import { useSTT } from './useSTT';
 
@@ -10,6 +11,9 @@ export function useRehearsal(config: SessionConfig | null) {
   const [lines, setLines] = useState<ScriptLine[]>([]);
   const [offBook, setOffBook] = useState(false);
   const [autoAdvance, setAutoAdvance] = useState(true);
+  // Timer state
+  const [lineElapsed, setLineElapsed] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const tts = useTTS();
   const stt = useSTT();
@@ -25,7 +29,23 @@ export function useRehearsal(config: SessionConfig | null) {
   const autoAdvanceRef = useRef(autoAdvance);
   autoAdvanceRef.current = autoAdvance;
 
-  // Initialize lines when config changes
+  const startTimer = useCallback(() => {
+    setLineElapsed(0);
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      setLineElapsed(prev => prev + 1);
+    }, 1000);
+  }, []);
+
+  const stopTimer = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => stopTimer(), [stopTimer]);
+
   useEffect(() => {
     if (config) {
       const filteredLines = getDialogueLines(config.script, config.showDirections);
@@ -37,19 +57,33 @@ export function useRehearsal(config: SessionConfig | null) {
     }
   }, [config]);
 
+  const speakLine = useCallback(async (text: string, character: string | undefined) => {
+    const cfg = configRef.current;
+    if (cfg?.elevenLabs?.apiKey && character) {
+      const voiceId = cfg.elevenLabs.characterVoiceMap[character];
+      if (voiceId) {
+        await speakWithElevenLabs(text, voiceId, cfg.elevenLabs.apiKey, cfg.speed);
+        return;
+      }
+    }
+    await tts.speak(text, character);
+  }, [tts]);
+
   const processLine = useCallback(async (index: number) => {
     const currentLines = linesRef.current;
     const currentConfig = configRef.current;
     if (!currentConfig || index >= currentLines.length) {
+      stopTimer();
       setState('COMPLETE');
       return;
     }
 
     const line = currentLines[index];
     setCurrentIndex(index);
+    stopTimer();
+    setLineElapsed(0);
 
     if (isDirection(line)) {
-      // Show direction briefly, then auto-advance
       setState('PLAYING_OTHER');
       await new Promise(resolve => setTimeout(resolve, 1500));
       if (stateRef.current === 'PAUSED') return;
@@ -59,33 +93,30 @@ export function useRehearsal(config: SessionConfig | null) {
 
     if (isOtherLine(line, currentConfig.myCharacter)) {
       setState('PLAYING_OTHER');
+      startTimer();
       try {
-        await tts.speak(line.text, line.character);
+        await speakLine(line.text, line.character);
       } catch {
-        // TTS error — just continue
+        // TTS error — continue
       }
+      stopTimer();
       if (stateRef.current === 'PAUSED') return;
-      // After speaking other character's line, move to next
       processLine(index + 1);
       return;
     }
 
     if (isMyLine(line, currentConfig.myCharacter)) {
       setState('WAITING_FOR_USER');
-
       if (autoAdvanceRef.current && stt.isSupported) {
-        // Start listening for user to speak
         stt.startListening(() => {
-          // Speech ended — advance to next line
           if (stateRef.current === 'WAITING_FOR_USER' || stateRef.current === 'USER_SPEAKING') {
             processLine(currentIndexRef.current + 1);
           }
         });
       }
-      // Otherwise wait for manual advance
       return;
     }
-  }, [tts, stt]);
+  }, [tts, stt, speakLine, startTimer, stopTimer]);
 
   const play = useCallback(() => {
     if (state === 'PAUSED') {
@@ -100,53 +131,53 @@ export function useRehearsal(config: SessionConfig | null) {
   const pause = useCallback(() => {
     tts.stop();
     stt.stopListening();
+    stopTimer();
     setState('PAUSED');
-  }, [tts, stt]);
+  }, [tts, stt, stopTimer]);
 
   const skip = useCallback(() => {
     tts.stop();
     stt.stopListening();
+    stopTimer();
     const next = currentIndex + 1;
     if (next < lines.length) {
       processLine(next);
     } else {
       setState('COMPLETE');
     }
-  }, [currentIndex, lines.length, tts, stt, processLine]);
+  }, [currentIndex, lines.length, tts, stt, stopTimer, processLine]);
 
   const back = useCallback(() => {
     tts.stop();
     stt.stopListening();
+    stopTimer();
     const prev = Math.max(0, currentIndex - 1);
     processLine(prev);
-  }, [currentIndex, tts, stt, processLine]);
+  }, [currentIndex, tts, stt, stopTimer, processLine]);
 
   const goToLine = useCallback((index: number) => {
     tts.stop();
     stt.stopListening();
+    stopTimer();
     processLine(Math.max(0, Math.min(index, lines.length - 1)));
-  }, [lines.length, tts, stt, processLine]);
+  }, [lines.length, tts, stt, stopTimer, processLine]);
 
   const restart = useCallback(() => {
     tts.stop();
     stt.stopListening();
+    stopTimer();
     setCurrentIndex(0);
+    setLineElapsed(0);
     setState('IDLE');
-  }, [tts, stt]);
+  }, [tts, stt, stopTimer]);
 
   const advance = useCallback(() => {
-    // Manual advance — used when user taps to move to next line
     stt.stopListening();
     processLine(currentIndex + 1);
   }, [currentIndex, stt, processLine]);
 
-  const toggleOffBook = useCallback(() => {
-    setOffBook(prev => !prev);
-  }, []);
-
-  const toggleAutoAdvance = useCallback(() => {
-    setAutoAdvance(prev => !prev);
-  }, []);
+  const toggleOffBook = useCallback(() => setOffBook(prev => !prev), []);
+  const toggleAutoAdvance = useCallback(() => setAutoAdvance(prev => !prev), []);
 
   const currentLine = lines[currentIndex] || null;
   const progress = {
@@ -163,6 +194,7 @@ export function useRehearsal(config: SessionConfig | null) {
     progress,
     offBook,
     autoAdvance,
+    lineElapsed,
     tts,
     stt,
     play,

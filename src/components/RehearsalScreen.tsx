@@ -5,6 +5,7 @@ import { LineDisplay } from './LineDisplay';
 import { ProgressBar } from './ProgressBar';
 import { TransportControls } from './TransportControls';
 import { MicIndicator } from './MicIndicator';
+import { LineTimer } from './LineTimer';
 
 interface RehearsalScreenProps {
   config: SessionConfig;
@@ -68,9 +69,10 @@ export function RehearsalScreen({ config, onExit }: RehearsalScreenProps) {
             isSpeaking={rehearsal.stt.isSpeaking}
           />
 
-          <div className="text-xs text-text-muted">
-            {rehearsal.state === 'COMPLETE' ? 'Done!' : ''}
-          </div>
+          <LineTimer
+            elapsed={rehearsal.lineElapsed}
+            isRunning={rehearsal.state === 'PLAYING_OTHER'}
+          />
         </div>
 
         <ProgressBar

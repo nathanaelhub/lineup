@@ -23,6 +23,18 @@ export interface CharacterVoiceMap {
   [character: string]: VoiceConfig;
 }
 
+export interface ElevenLabsVoice {
+  voice_id: string;
+  name: string;
+  category?: string;
+}
+
+export interface ElevenLabsConfig {
+  apiKey: string;
+  voices: ElevenLabsVoice[];
+  characterVoiceMap: Record<string, string>; // character -> voice_id
+}
+
 export interface SessionConfig {
   script: ParsedScript;
   myCharacter: string;
@@ -30,6 +42,7 @@ export interface SessionConfig {
   offBook: boolean;
   showDirections: boolean;
   speed: number;
+  elevenLabs?: ElevenLabsConfig;
 }
 
 export type RehearsalState =
