@@ -37,7 +37,7 @@ class TTSEngine {
     return this.voices.filter(v => v.lang.startsWith('en'));
   }
 
-  assignVoicesToCharacters(characters: string[]): Record<string, VoiceConfig> {
+  assignVoicesToCharacters(characters: string[], pitchOverrides?: Record<string, number>): Record<string, VoiceConfig> {
     const englishVoices = this.getEnglishVoices();
     const map: Record<string, VoiceConfig> = {};
 
@@ -48,7 +48,7 @@ class TTSEngine {
       map[char] = {
         voice,
         rate: this._rate,
-        pitch: 0.9 + (i * 0.15) % 0.6, // Vary pitch slightly per character
+        pitch: pitchOverrides?.[char] ?? (0.9 + (i * 0.15) % 0.6),
         volume: this._volume,
       };
     });

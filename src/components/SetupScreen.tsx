@@ -4,6 +4,7 @@ import { CharacterSelect } from './CharacterSelect';
 import { ElevenLabsSettings } from './ElevenLabsSettings';
 import { getCharacterColor } from '../utils/voiceMapper';
 import { toggleLineType } from '../lib/scriptParser';
+import { getPosition } from '../utils/storage';
 
 interface SetupScreenProps {
   script: ParsedScript;
@@ -18,8 +19,19 @@ export function SetupScreen({ script: initialScript, onStart, onBack }: SetupScr
   const [offBook, setOffBook] = useState(false);
   const [showDirections, setShowDirections] = useState(true);
   const [speed, setSpeed] = useState(1.0);
+  const [cueMode, setCueMode] = useState(false);
   const [elevenLabs, setElevenLabs] = useState<ElevenLabsConfig | undefined>();
   const [showCorrection, setShowCorrection] = useState(false);
+  const [characterPitchMap, setCharacterPitchMap] = useState<Record<string, number>>({});
+
+  const justMyCues = cueMode && offBook;
+  const handleJustMyCues = (val: boolean) => {
+    setCueMode(val);
+    setOffBook(val);
+  };
+
+  const savedPosition = myCharacter ? getPosition(script.title) : null;
+  const resumeAvailable = savedPosition && savedPosition.character === myCharacter && savedPosition.lineIndex > 0;
 
   const previewLines = script.lines.filter(l => l.type !== 'scene_heading').slice(0, 12);
 
@@ -95,6 +107,8 @@ export function SetupScreen({ script: initialScript, onStart, onBack }: SetupScr
           <div className="space-y-2">
             <ToggleOption label="Auto-advance" description="Mic detects when you finish speaking" checked={autoAdvance} onChange={setAutoAdvance} />
             <ToggleOption label="Off-book mode" description="Hides your lines for memory practice" checked={offBook} onChange={setOffBook} />
+            <ToggleOption label="Cue mode" description="Shows only last 3 words of other character's line" checked={cueMode} onChange={setCueMode} />
+            <ToggleOption label="Just my cues" description="Cue mode + off-book together in one tap" checked={justMyCues} onChange={handleJustMyCues} />
             <ToggleOption label="Show stage directions" description="Pause briefly at stage directions" checked={showDirections} onChange={setShowDirections} />
           </div>
 
@@ -114,6 +128,33 @@ export function SetupScreen({ script: initialScript, onStart, onBack }: SetupScr
               ))}
             </div>
           </div>
+
+          {/* Voice Pitch — browser TTS only, not ElevenLabs */}
+          {!elevenLabs?.apiKey && myCharacter && script.characters.filter(c => c !== myCharacter).length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-sm text-text-primary">Voice Pitch</span>
+                <span className="text-xs text-text-muted">per character</span>
+              </div>
+              {script.characters.filter(c => c !== myCharacter).map(char => (
+                <div key={char} className="flex items-center gap-3 bg-bg-secondary rounded-xl px-4 py-2.5">
+                  <span className="text-xs font-medium text-text-secondary min-w-0 flex-1 truncate">{char}</span>
+                  <input
+                    type="range"
+                    min={0.5}
+                    max={2.0}
+                    step={0.1}
+                    value={characterPitchMap[char] ?? 1.0}
+                    onChange={(e) => setCharacterPitchMap(prev => ({ ...prev, [char]: parseFloat(e.target.value) }))}
+                    className="w-28 accent-accent"
+                  />
+                  <span className="text-xs text-text-muted w-7 text-right tabular-nums">
+                    {(characterPitchMap[char] ?? 1.0).toFixed(1)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* ElevenLabs AI Voices */}
@@ -126,11 +167,24 @@ export function SetupScreen({ script: initialScript, onStart, onBack }: SetupScr
           />
         </div>
 
+        {/* Resume position prompt */}
+        {resumeAvailable && (
+          <button
+            onClick={() => {
+              onStart({ script, myCharacter: myCharacter!, autoAdvance, offBook, showDirections, cueMode, speed, startIndex: savedPosition!.lineIndex, elevenLabs, characterPitchMap });
+            }}
+            className="w-full py-3 rounded-2xl border border-accent/40 text-accent text-sm font-medium
+              hover:bg-accent/10 transition-all active:scale-[0.98] text-center"
+          >
+            Resume from line {savedPosition!.lineIndex + 1} →
+          </button>
+        )}
+
         {/* Start */}
         <button
           onClick={() => {
             if (myCharacter) {
-              onStart({ script, myCharacter, autoAdvance, offBook, showDirections, speed, elevenLabs });
+              onStart({ script, myCharacter, autoAdvance, offBook, showDirections, cueMode, speed, elevenLabs, characterPitchMap });
             }
           }}
           disabled={!myCharacter}

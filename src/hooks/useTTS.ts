@@ -13,8 +13,8 @@ export function useTTS() {
     ttsEngine.waitForVoices().then(() => setVoicesReady(true));
   }, []);
 
-  const assignVoices = useCallback((characters: string[]) => {
-    voiceMapRef.current = ttsEngine.assignVoicesToCharacters(characters);
+  const assignVoices = useCallback((characters: string[], pitchOverrides?: Record<string, number>) => {
+    voiceMapRef.current = ttsEngine.assignVoicesToCharacters(characters, pitchOverrides);
   }, []);
 
   const speak = useCallback(async (text: string, character?: string) => {

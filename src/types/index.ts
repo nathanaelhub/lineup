@@ -41,8 +41,23 @@ export interface SessionConfig {
   autoAdvance: boolean;
   offBook: boolean;
   showDirections: boolean;
+  cueMode: boolean;
   speed: number;
+  startIndex?: number;
   elevenLabs?: ElevenLabsConfig;
+  characterPitchMap?: Record<string, number>;
+}
+
+export interface TranscriptFeedback {
+  heard: string;
+  score: number;
+}
+
+export interface SavedPosition {
+  scriptTitle: string;
+  lineIndex: number;
+  character: string;
+  savedAt: number;
 }
 
 export type RehearsalState =

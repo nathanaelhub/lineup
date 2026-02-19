@@ -18,19 +18,23 @@ const NON_CHARACTER_PHRASES = new Set([
   'BEGIN TITLE SEQUENCE', 'END TITLE SEQUENCE', 'TITLE SEQUENCE',
   'SERIES OF SHOTS', 'MONTAGE', 'BEGIN MONTAGE', 'END MONTAGE',
   'CLOSE ON', 'CLOSER', 'CLOSEUP', 'CLOSE UP',
-  'INSERT', 'INSERT SHOT', 'BACK TO SCENE',
+  'INSERT', 'INSERT SHOT',
   'POV', 'POV SHOT', 'ANGLE ON', 'NEW ANGLE', 'ANOTHER ANGLE',
   'WIDE', 'WIDE ON', 'WIDE SHOT', 'OVERHEAD',
   'THE END', 'CONTINUED', 'OMITTED',
   'A BEAT', 'BEAT', 'PAUSE', 'SILENCE', 'MORE',
   'NOTE', 'NOTE TO', 'REVISED', 'REVISION',
+  // Page continuation artifacts
+  'CONTINUED:', 'CONT\'D', '(CONTINUED)', '(MORE)',
 ]);
 
 function isNonCharacterCaps(name: string): boolean {
   const upper = name.toUpperCase().trim();
   if (NON_CHARACTER_PHRASES.has(upper)) return true;
-  // Also check if it starts with transition-like patterns
+  // Also matches if starts with transition-like words
   if (/^(FADE|CUT|DISSOLVE|SMASH|MATCH|JUMP|WIPE|IRIS|INTERCUT|BACK TO|CLOSE|INSERT|BEGIN|END|TITLE|SERIES|MONTAGE|ANGLE|ANOTHER|NEW ANGLE)/.test(upper)) return true;
+  // Pure numbers (page numbers in margins)
+  if (/^\d+\.?$/.test(upper)) return true;
   return false;
 }
 
@@ -42,13 +46,13 @@ function isAllCapsOrCharacterName(line: string): boolean {
   return letterCount > 0 && upperCount / letterCount >= 0.8;
 }
 
-// Check if text looks like prose action (starts lowercase or looks like narrative)
+// Check if text looks like prose action rather than dialogue
 function looksLikeAction(text: string): boolean {
   if (!text) return false;
-  // Starts with lowercase letter
+  // Starts with lowercase letter → definitely action/continuation prose
   if (/^[a-z]/.test(text)) return true;
-  // Very long "character name" is probably action
-  if (text.split(/\s+/).length > 5) return true;
+  // Very long line is probably action (8+ words)
+  if (text.split(/\s+/).length > 8) return true;
   return false;
 }
 
@@ -59,15 +63,48 @@ function cleanCharacterName(name: string): string {
     .trim();
 }
 
+// Returns leading space count (indentation) of a raw line
+function getIndent(rawLine: string): number {
+  return rawLine.match(/^(\s*)/)?.[1].length ?? 0;
+}
+
+// Detect if the input was produced by a PDF extractor that preserves indentation.
+// We consider it indented mode if >15% of non-empty lines have ≥8 leading spaces.
+function detectIndentedMode(rawLines: string[]): boolean {
+  const nonEmpty = rawLines.filter(l => l.trim().length > 0);
+  if (nonEmpty.length < 10) return false;
+  const indented = nonEmpty.filter(l => getIndent(l) >= 8).length;
+  return indented / nonEmpty.length > 0.15;
+}
+
+// In indented (PDF) mode, classify a line by its indent level.
+// Standard screenplay indentation (in points, converted to spaces at ~7pt/space):
+//   Action:       ~0 spaces   (leftmost, ~108pt)
+//   Dialogue:     ~10 spaces  (~180pt)
+//   Parenthetical:~16 spaces  (~223pt)
+//   Character:    ~22 spaces  (~266pt)
+type IndentClass = 'action' | 'dialogue' | 'character' | 'unknown';
+
+function classifyByIndent(indent: number): IndentClass {
+  if (indent >= 18) return 'character';  // most indented = character name or parenthetical
+  if (indent >= 8) return 'dialogue';    // moderate = dialogue
+  if (indent < 5) return 'action';       // leftmost = stage direction / action
+  return 'unknown';
+}
+
 export function parseScript(rawText: string): ParsedScript {
-  const lines = rawText.split(/\r?\n/);
+  const rawLines = rawText.split(/\r?\n/);
+  const isIndented = detectIndentedMode(rawLines);
+
   const scriptLines: ScriptLine[] = [];
   const characterSet = new Set<string>();
   let lineIndex = 0;
 
   let i = 0;
-  while (i < lines.length) {
-    const line = lines[i].trim();
+  while (i < rawLines.length) {
+    const rawLine = rawLines[i];
+    const indent = getIndent(rawLine);
+    const line = rawLine.trim();
 
     if (!line) { i++; continue; }
 
@@ -78,10 +115,17 @@ export function parseScript(rawText: string): ParsedScript {
       continue;
     }
 
-    // Parenthetical stage directions
+    // Parenthetical stage directions (full-line)
     const dirMatch = line.match(DIRECTION_PATTERN) || line.match(DIRECTION_BLOCK_PATTERN);
     if (dirMatch) {
       scriptLines.push({ type: 'direction', text: dirMatch[1].trim(), lineIndex: lineIndex++ });
+      i++;
+      continue;
+    }
+
+    // In indented (PDF) mode: action-level lines are never character names
+    if (isIndented && classifyByIndent(indent) === 'action') {
+      scriptLines.push({ type: 'direction', text: line, lineIndex: lineIndex++ });
       i++;
       continue;
     }
@@ -90,39 +134,57 @@ export function parseScript(rawText: string): ParsedScript {
     const nameWithoutTrailing = line.replace(/[:–—-]\s*$/, '').trim();
     const potentialName = cleanCharacterName(nameWithoutTrailing);
 
-    if (
-      CHARACTER_NAME_PATTERN.test(nameWithoutTrailing) &&
-      isAllCapsOrCharacterName(nameWithoutTrailing) &&
-      !isNonCharacterCaps(potentialName) &&
-      potentialName.length >= 2
-    ) {
-      // Check if inline colon dialogue: "CHARACTER: dialogue text"
+    // In indented mode, high-indent lines are character names even without strict caps check
+    // In plain text mode, require the usual ALL-CAPS pattern
+    const isCharacterCandidate = isIndented
+      ? (classifyByIndent(indent) === 'character' &&
+         potentialName.length >= 2 &&
+         !isNonCharacterCaps(potentialName) &&
+         !looksLikeAction(line))
+      : (CHARACTER_NAME_PATTERN.test(nameWithoutTrailing) &&
+         isAllCapsOrCharacterName(nameWithoutTrailing) &&
+         !isNonCharacterCaps(potentialName) &&
+         potentialName.length >= 2);
+
+    if (isCharacterCandidate) {
+      // Check for inline colon dialogue: "CHARACTER: dialogue text"
       const colonMatch = line.match(/^([A-Z][A-Z\s.''-]+)[:–—]\s+(.+)$/);
       if (colonMatch && !isNonCharacterCaps(colonMatch[1].trim())) {
         const charName = cleanCharacterName(colonMatch[1]);
         characterSet.add(charName);
         scriptLines.push({
           type: 'dialogue', character: charName,
-          text: colonMatch[2].trim(), lineIndex: lineIndex++,
+          text: colonMatch[2].trim().replace(/\s*\([^)]*\)\s*$/, '').trim(), lineIndex: lineIndex++,
         });
         i++;
         continue;
       }
 
-      // Look ahead to collect dialogue — validate this is really a character
+      // Look ahead to collect dialogue lines
       const dialogueLines: string[] = [];
       let j = i + 1;
 
-      while (j < lines.length) {
-        const nextLine = lines[j].trim();
+      while (j < rawLines.length) {
+        const nextRaw = rawLines[j];
+        const nextIndent = getIndent(nextRaw);
+        const nextLine = nextRaw.trim();
+
         if (!nextLine) break;
 
-        const nextNameClean = nextLine.replace(/[:–—-]\s*$/, '').trim();
-        if (
-          (CHARACTER_NAME_PATTERN.test(nextNameClean) && isAllCapsOrCharacterName(nextNameClean)) ||
-          SCENE_HEADING_PATTERN.test(nextLine)
-        ) break;
+        // In indented mode: action-level line ends the dialogue block
+        if (isIndented && classifyByIndent(nextIndent) === 'action') break;
 
+        // Another character name or scene heading ends the block
+        const nextNameClean = nextLine.replace(/[:–—-]\s*$/, '').trim();
+        const nextIsCharacter = isIndented
+          ? (classifyByIndent(nextIndent) === 'character' &&
+             !isNonCharacterCaps(cleanCharacterName(nextNameClean)) &&
+             !looksLikeAction(nextLine))
+          : (CHARACTER_NAME_PATTERN.test(nextNameClean) && isAllCapsOrCharacterName(nextNameClean));
+
+        if (nextIsCharacter || SCENE_HEADING_PATTERN.test(nextLine)) break;
+
+        // Full-line parenthetical (direction) inside dialogue block
         const inlineDirMatch = nextLine.match(DIRECTION_PATTERN);
         if (inlineDirMatch) {
           if (dialogueLines.length > 0) {
@@ -138,15 +200,22 @@ export function parseScript(rawText: string): ParsedScript {
           continue;
         }
 
-        dialogueLines.push(nextLine);
+        // In plain text mode: stop collecting if a line looks like action prose
+        // (long line starting uppercase – likely a narrative sentence, not dialogue)
+        if (!isIndented && looksLikeAction(nextLine) && dialogueLines.length > 0) break;
+
+        // Strip any leading parenthetical stage direction from the start of a dialogue line.
+        // Handles page-continuation markers like (CONT'D), (MORE), and inline acting notes
+        // like (embarrassed), (singing), (pissy) that PDF layouts attach to the start of text.
+        const cleanedNext = nextLine.replace(/^\([^)]+\)\s*/, '').trim();
+        if (cleanedNext) dialogueLines.push(cleanedNext);
         j++;
       }
 
       if (dialogueLines.length > 0) {
-        // Validate: if all "dialogue" lines look like action prose, treat as direction
+        // Final validation: if all collected lines look like action, treat as direction
         const allLookLikeAction = dialogueLines.every(l => looksLikeAction(l));
         if (allLookLikeAction) {
-          // Treat the name line and following lines as a direction block
           scriptLines.push({
             type: 'direction',
             text: [line, ...dialogueLines].join(' '),
@@ -156,7 +225,7 @@ export function parseScript(rawText: string): ParsedScript {
           characterSet.add(potentialName);
           scriptLines.push({
             type: 'dialogue', character: potentialName,
-            text: dialogueLines.join(' '), lineIndex: lineIndex++,
+            text: dialogueLines.join(' ').replace(/\s*\([^)]*\)\s*$/, '').trim(), lineIndex: lineIndex++,
           });
         }
       } else {
@@ -176,8 +245,6 @@ export function parseScript(rawText: string): ParsedScript {
   const firstHeading = scriptLines.find(l => l.type === 'scene_heading');
   const title = firstHeading?.text || 'Untitled Script';
 
-  // Filter out characters that appeared only once with no real dialogue
-  // (likely misparses) — keep only chars with 2+ lines OR any char with 1+ substantial line
   const charLineCounts = new Map<string, number>();
   scriptLines.forEach(l => {
     if (l.type === 'dialogue' && l.character) {
@@ -185,8 +252,6 @@ export function parseScript(rawText: string): ParsedScript {
     }
   });
 
-  // Characters that appear only once AND whose "dialogue" is short are suspect
-  // Keep them but flag them — user can correct in setup
   const characters = Array.from(characterSet)
     .filter(c => charLineCounts.has(c))
     .sort();
@@ -207,7 +272,6 @@ export function toggleLineType(script: ParsedScript, lineIndex: number): ParsedS
     return l;
   });
 
-  // Recompute characters
   const characters = Array.from(
     new Set(lines.filter(l => l.type === 'dialogue' && l.character).map(l => l.character!))
   ).sort();
