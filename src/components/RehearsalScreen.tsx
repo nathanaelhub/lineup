@@ -13,7 +13,7 @@ import { ScriptJumpMenu } from './ScriptJumpMenu';
 interface RehearsalScreenProps {
   config: SessionConfig;
   onExit: () => void;
-  installPrompt?: any;
+  installPrompt?: boolean;
   onInstall?: () => void;
 }
 
@@ -162,7 +162,7 @@ export function RehearsalScreen({ config, onExit, installPrompt, onInstall }: Re
           loopStart={rehearsal.loopStart}
           loopEnd={rehearsal.loopEnd}
           loopIteration={rehearsal.loopIteration}
-          isPWAInstallable={!!installPrompt}
+          isPWAInstallable={installPrompt}
           onPlay={rehearsal.play}
           onPause={rehearsal.pause}
           onSkip={rehearsal.skip}

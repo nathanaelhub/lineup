@@ -1,4 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt(): Promise<void>;
+}
 import type { AppScreen, ParsedScript, SessionConfig, SavedScript } from './types';
 import { parseScript } from './lib/scriptParser';
 import { getSavedScripts, saveScript, deleteScript } from './utils/storage';
@@ -11,12 +15,12 @@ function App() {
   const [parsedScript, setParsedScript] = useState<ParsedScript | null>(null);
   const [sessionConfig, setSessionConfig] = useState<SessionConfig | null>(null);
   const [savedScripts, setSavedScripts] = useState<SavedScript[]>(() => getSavedScripts());
-  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
 
   useEffect(() => {
     const handler = (e: Event) => {
       e.preventDefault();
-      setInstallPrompt(e);
+      setInstallPrompt(e as BeforeInstallPromptEvent);
     };
     window.addEventListener('beforeinstallprompt', handler);
     return () => window.removeEventListener('beforeinstallprompt', handler);
@@ -83,7 +87,7 @@ function App() {
         <RehearsalScreen
           config={sessionConfig}
           onExit={handleExitRehearsal}
-          installPrompt={installPrompt}
+          installPrompt={!!installPrompt}
           onInstall={() => { installPrompt?.prompt(); setInstallPrompt(null); }}
         />
       )}
