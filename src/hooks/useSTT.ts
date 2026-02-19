@@ -7,6 +7,7 @@ export function useSTT() {
   const [transcript, setTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
   const onSpeechEndRef = useRef<(() => void) | null>(null);
+  const transcriptRef = useRef('');
 
   useEffect(() => {
     sttListener.setCallbacks({
@@ -17,6 +18,7 @@ export function useSTT() {
         onSpeechEndRef.current?.();
       },
       onTranscript: (text, _isFinal) => {
+        transcriptRef.current = text;
         setTranscript(text);
       },
       onError: (err) => {
@@ -27,6 +29,7 @@ export function useSTT() {
   }, []);
 
   const startListening = useCallback((onEnd?: () => void) => {
+    transcriptRef.current = '';
     setTranscript('');
     setError(null);
     onSpeechEndRef.current = onEnd || null;
@@ -44,6 +47,7 @@ export function useSTT() {
     isListening,
     isSpeaking,
     transcript,
+    transcriptRef,
     error,
     startListening,
     stopListening,

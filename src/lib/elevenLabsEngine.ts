@@ -18,6 +18,16 @@ export async function fetchElevenLabsVoices(apiKey: string): Promise<ElevenLabsV
   }));
 }
 
+let currentAudio: HTMLAudioElement | null = null;
+
+export function stopElevenLabsAudio(): void {
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio.src = '';
+    currentAudio = null;
+  }
+}
+
 export async function speakWithElevenLabs(
   text: string,
   voiceId: string,
@@ -50,11 +60,14 @@ export async function speakWithElevenLabs(
 
   return new Promise((resolve, reject) => {
     const audio = new Audio(url);
+    currentAudio = audio;
     audio.onended = () => {
+      currentAudio = null;
       URL.revokeObjectURL(url);
       resolve();
     };
     audio.onerror = () => {
+      currentAudio = null;
       URL.revokeObjectURL(url);
       reject(new Error('Audio playback error'));
     };
