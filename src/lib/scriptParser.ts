@@ -213,8 +213,10 @@ export function parseScript(rawText: string): ParsedScript {
       }
 
       if (dialogueLines.length > 0) {
-        // Final validation: if all collected lines look like action, treat as direction
-        const allLookLikeAction = dialogueLines.every(l => looksLikeAction(l));
+        // In indented mode the indent level already confirms these are dialogue lines —
+        // skip the action heuristic which incorrectly drops long single-line speeches.
+        // Only apply it in plain-text mode where we might accidentally grab action prose.
+        const allLookLikeAction = !isIndented && dialogueLines.every(l => looksLikeAction(l));
         if (allLookLikeAction) {
           scriptLines.push({
             type: 'direction',

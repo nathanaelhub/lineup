@@ -7,8 +7,14 @@ export async function fetchElevenLabsVoices(apiKey: string): Promise<ElevenLabsV
     headers: { 'xi-api-key': apiKey },
   });
   if (!res.ok) {
-    if (res.status === 401) throw new Error('Invalid API key');
-    throw new Error(`ElevenLabs error: ${res.status}`);
+    let message = `ElevenLabs error: ${res.status}`;
+    try {
+      const body = await res.json();
+      const detail = body?.detail;
+      if (detail?.message) message = detail.message;
+      else if (typeof detail === 'string') message = detail;
+    } catch {}
+    throw new Error(message);
   }
   const data = await res.json();
   return (data.voices as any[]).map(v => ({
@@ -52,7 +58,14 @@ export async function speakWithElevenLabs(
   });
 
   if (!res.ok) {
-    throw new Error(`ElevenLabs TTS error: ${res.status}`);
+    let message = `ElevenLabs TTS error: ${res.status}`;
+    try {
+      const body = await res.json();
+      const detail = body?.detail;
+      if (detail?.message) message = detail.message;
+      else if (typeof detail === 'string') message = detail;
+    } catch {}
+    throw new Error(message);
   }
 
   const blob = await res.blob();

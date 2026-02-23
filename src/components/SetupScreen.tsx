@@ -22,6 +22,7 @@ export function SetupScreen({ script: initialScript, onStart, onBack }: SetupScr
   const [cueMode, setCueMode] = useState(false);
   const [elevenLabs, setElevenLabs] = useState<ElevenLabsConfig | undefined>();
   const [showCorrection, setShowCorrection] = useState(false);
+  const [showAllLines, setShowAllLines] = useState(false);
   const [characterPitchMap, setCharacterPitchMap] = useState<Record<string, number>>({});
 
   const justMyCues = cueMode && offBook;
@@ -33,7 +34,8 @@ export function SetupScreen({ script: initialScript, onStart, onBack }: SetupScr
   const savedPosition = myCharacter ? getPosition(script.title) : null;
   const resumeAvailable = savedPosition && savedPosition.character === myCharacter && savedPosition.lineIndex > 0;
 
-  const previewLines = script.lines.filter(l => l.type !== 'scene_heading').slice(0, 12);
+  const allPreviewLines = script.lines;
+  const previewLines = showAllLines ? allPreviewLines : allPreviewLines.slice(0, 12);
 
   const handleToggleLine = useCallback((lineIndex: number) => {
     setScript(prev => toggleLineType(prev, lineIndex));
@@ -77,7 +79,7 @@ export function SetupScreen({ script: initialScript, onStart, onBack }: SetupScr
             </button>
           </div>
 
-          <div className="bg-bg-secondary rounded-xl p-4 space-y-1.5 max-h-56 overflow-y-auto">
+          <div className={`bg-bg-secondary rounded-xl p-4 space-y-1.5 overflow-y-auto ${showAllLines ? 'max-h-[70vh]' : 'max-h-56'}`}>
             {previewLines.map((line) => (
               <ParsedLineRow
                 key={line.lineIndex}
@@ -87,10 +89,15 @@ export function SetupScreen({ script: initialScript, onStart, onBack }: SetupScr
                 onToggle={handleToggleLine}
               />
             ))}
-            {script.lines.filter(l => l.type !== 'scene_heading').length > 12 && (
-              <p className="text-xs text-text-muted italic pt-1">
-                +{script.lines.filter(l => l.type !== 'scene_heading').length - 12} more lines...
-              </p>
+            {allPreviewLines.length > 12 && (
+              <button
+                onClick={() => setShowAllLines(v => !v)}
+                className="w-full text-xs text-accent hover:text-accent-glow pt-2 pb-1 text-center transition-colors"
+              >
+                {showAllLines
+                  ? '↑ Collapse'
+                  : `Show all ${allPreviewLines.length} lines ↓`}
+              </button>
             )}
           </div>
 
@@ -213,18 +220,27 @@ function ParsedLineRow({
   onToggle: (idx: number) => void;
 }) {
   const isDir = line.type === 'direction';
+  const isHeading = line.type === 'scene_heading';
   const color = line.character ? getCharacterColor(line.character, characters) : undefined;
 
   const content = (
     <div className={`flex gap-2 items-start text-xs ${editable ? 'cursor-pointer hover:opacity-80' : ''}`}>
-      {editable && (
+      {/* Line number */}
+      <span className="shrink-0 w-6 text-right text-text-muted/40 tabular-nums mt-0.5 select-none">
+        {line.lineIndex + 1}
+      </span>
+      {editable && !isHeading && (
         <div className={`shrink-0 mt-0.5 w-4 h-4 rounded border flex items-center justify-center
           ${isDir ? 'border-direction/50 text-direction' : 'border-accent/50 text-accent'}`}
         >
           {isDir ? 'D' : 'L'}
         </div>
       )}
-      {isDir ? (
+      {isHeading ? (
+        <p className="font-bold uppercase tracking-widest text-text-muted/60 pt-2 pb-0.5">
+          {line.text}
+        </p>
+      ) : isDir ? (
         <p className="italic text-direction leading-relaxed">({line.text.slice(0, 80)}{line.text.length > 80 ? '…' : ''})</p>
       ) : (
         <div>
@@ -237,7 +253,7 @@ function ParsedLineRow({
     </div>
   );
 
-  if (editable) {
+  if (editable && !isHeading) {
     return (
       <button className="w-full text-left" onClick={() => onToggle(line.lineIndex)}>
         {content}
