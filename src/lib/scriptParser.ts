@@ -261,16 +261,32 @@ export function parseScript(rawText: string): ParsedScript {
   return { title, characters, lines: scriptLines, rawText };
 }
 
-// Allow toggling a line's type (for manual correction)
+// Allow toggling a line's type (for manual correction).
+// Cycles: direction → dialogue (char[0]) → dialogue (char[1]) → … → direction
 export function toggleLineType(script: ParsedScript, lineIndex: number): ParsedScript {
+  const allChars = script.characters;
+
   const lines = script.lines.map(l => {
     if (l.lineIndex !== lineIndex) return l;
-    if (l.type === 'dialogue') {
-      return { ...l, type: 'direction' as const };
-    }
+    if (l.type === 'scene_heading') return l;
+
     if (l.type === 'direction') {
-      return { ...l, type: 'dialogue' as const };
+      // direction → dialogue assigned to first character
+      return { ...l, type: 'dialogue' as const, character: allChars[0] };
     }
+
+    if (l.type === 'dialogue') {
+      const charIndex = l.character ? allChars.indexOf(l.character) : -1;
+      const nextIndex = charIndex + 1;
+      if (nextIndex >= allChars.length) {
+        // Wrapped past last character → back to direction
+        const { character: _c, ...rest } = l;
+        return { ...rest, type: 'direction' as const };
+      }
+      // Advance to next character
+      return { ...l, character: allChars[nextIndex] };
+    }
+
     return l;
   });
 

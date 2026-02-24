@@ -103,7 +103,7 @@ export function SetupScreen({ script: initialScript, onStart, onBack }: SetupScr
 
           {showCorrection && (
             <p className="text-xs text-text-muted px-1">
-              Tap any line to toggle it between dialogue and stage direction.
+              Tap to cycle: stage direction → each character → back to direction.
             </p>
           )}
         </div>
@@ -230,10 +230,10 @@ function ParsedLineRow({
         {line.lineIndex + 1}
       </span>
       {editable && !isHeading && (
-        <div className={`shrink-0 mt-0.5 w-4 h-4 rounded border flex items-center justify-center
+        <div className={`shrink-0 mt-0.5 px-1 min-w-[1.25rem] h-4 rounded border flex items-center justify-center text-[9px] font-bold leading-none
           ${isDir ? 'border-direction/50 text-direction' : 'border-accent/50 text-accent'}`}
         >
-          {isDir ? 'D' : 'L'}
+          {isDir ? 'D' : (line.character ? line.character.slice(0, 3) : 'L')}
         </div>
       )}
       {isHeading ? (

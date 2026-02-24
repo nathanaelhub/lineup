@@ -9,6 +9,9 @@ class STTListener {
   private recognition: any = null;
   private isListening: boolean = false;
   private callbacks: STTCallbacks = {};
+  // Set to true in stopListening() so the resulting async onend event
+  // doesn't fire onSpeechEnd (which would cause a spurious line advance).
+  private suppressNextEnd: boolean = false;
 
   constructor() {
     const SpeechRecognition =
@@ -29,9 +32,10 @@ class STTListener {
         this.callbacks.onSpeechStart?.();
       };
 
-      this.recognition.onspeechend = () => {
-        this.callbacks.onSpeechEnd?.();
-      };
+      // onspeechend fires when the user stops talking but BEFORE onresult
+      // delivers the final transcript. We intentionally do NOT call onSpeechEnd
+      // here — we wait for onend (which fires after onresult) so the transcript
+      // is available before advancing.
 
       this.recognition.onresult = (event: any) => {
         let finalTranscript = '';
@@ -55,6 +59,10 @@ class STTListener {
 
       this.recognition.onend = () => {
         this.isListening = false;
+        if (this.suppressNextEnd) {
+          this.suppressNextEnd = false;
+          return;
+        }
         this.callbacks.onSpeechEnd?.();
       };
 
@@ -91,6 +99,9 @@ class STTListener {
 
   stopListening(): void {
     if (!this.recognition) return;
+    // Suppress the onend that recognition.stop() will fire asynchronously,
+    // so it doesn't trigger a spurious onSpeechEnd → advance.
+    this.suppressNextEnd = true;
     try {
       this.recognition.stop();
     } catch {
