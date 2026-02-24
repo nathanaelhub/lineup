@@ -169,7 +169,14 @@ export function parseScript(rawText: string): ParsedScript {
         const nextIndent = getIndent(nextRaw);
         const nextLine = nextRaw.trim();
 
-        if (!nextLine) break;
+        if (!nextLine) {
+          // In indented mode, skip a single blank line that falls between a
+          // character header and their first dialogue line (PDF formatting artifact).
+          // Only skip if we haven't collected any dialogue yet; once dialogue has
+          // started, a blank line always ends the block.
+          if (isIndented && dialogueLines.length === 0) { j++; continue; }
+          break;
+        }
 
         // In indented mode: action-level line ends the dialogue block
         if (isIndented && classifyByIndent(nextIndent) === 'action') break;
