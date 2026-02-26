@@ -12,6 +12,8 @@ class STTListener {
   // Set to true in stopListening() so the resulting async onend event
   // doesn't fire onSpeechEnd (which would cause a spurious line advance).
   private suppressNextEnd: boolean = false;
+  private hadSpeech: boolean = false;
+  private speechEndTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     const SpeechRecognition =
@@ -29,6 +31,7 @@ class STTListener {
       };
 
       this.recognition.onspeechstart = () => {
+        this.hadSpeech = true;
         this.callbacks.onSpeechStart?.();
       };
 
@@ -61,9 +64,22 @@ class STTListener {
         this.isListening = false;
         if (this.suppressNextEnd) {
           this.suppressNextEnd = false;
+          this.hadSpeech = false;
           return;
         }
-        this.callbacks.onSpeechEnd?.();
+        if (!this.hadSpeech) {
+          // No speech detected — advance immediately (no point waiting)
+          this.callbacks.onSpeechEnd?.();
+          return;
+        }
+        // Speech was detected — wait 1500ms grace period before advancing,
+        // in case the user paused mid-sentence.
+        this.hadSpeech = false;
+        if (this.speechEndTimer) clearTimeout(this.speechEndTimer);
+        this.speechEndTimer = setTimeout(() => {
+          this.speechEndTimer = null;
+          this.callbacks.onSpeechEnd?.();
+        }, 1500);
       };
 
       this.recognition.onerror = (event: any) => {
@@ -101,6 +117,8 @@ class STTListener {
     if (!this.recognition) return;
     // Suppress the onend that recognition.stop() will fire asynchronously,
     // so it doesn't trigger a spurious onSpeechEnd → advance.
+    if (this.speechEndTimer) { clearTimeout(this.speechEndTimer); this.speechEndTimer = null; }
+    this.hadSpeech = false;
     this.suppressNextEnd = true;
     try {
       this.recognition.stop();
