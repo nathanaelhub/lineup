@@ -185,6 +185,7 @@ export function parseScript(rawText: string): ParsedScript {
         const nextNameClean = nextLine.replace(/[:–—-]\s*$/, '').trim();
         const nextIsCharacter = isIndented
           ? (classifyByIndent(nextIndent) === 'character' &&
+             cleanCharacterName(nextNameClean).length >= 2 &&
              !isNonCharacterCaps(cleanCharacterName(nextNameClean)) &&
              !looksLikeAction(nextLine))
           : (CHARACTER_NAME_PATTERN.test(nextNameClean) && isAllCapsOrCharacterName(nextNameClean));
