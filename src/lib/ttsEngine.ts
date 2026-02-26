@@ -58,27 +58,21 @@ class TTSEngine {
 
   speak(text: string, config?: Partial<VoiceConfig>): Promise<void> {
     return new Promise((resolve, reject) => {
-      this.stop();
-
+      this.synth.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       if (config?.voice) utterance.voice = config.voice;
       utterance.rate = config?.rate ?? this._rate;
       utterance.pitch = config?.pitch ?? 1.0;
       utterance.volume = config?.volume ?? this._volume;
-
-      utterance.onend = () => {
-                resolve();
-      };
+      utterance.onend = () => { resolve(); };
       utterance.onerror = (e) => {
-                // 'interrupted' and 'canceled' are not real errors
-        if (e.error === 'interrupted' || e.error === 'canceled') {
-          resolve();
-        } else {
-          reject(e);
-        }
+        if (e.error === 'interrupted' || e.error === 'canceled') { resolve(); }
+        else { reject(e); }
       };
-
-      this.synth.speak(utterance);
+      // Chrome race condition: cancel() then immediate speak() causes the new
+      // utterance to receive an 'interrupted' error instantly. A short delay
+      // lets Chrome finish processing the cancel before accepting new speech.
+      setTimeout(() => { this.synth.speak(utterance); }, 50);
     });
   }
 
