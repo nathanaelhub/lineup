@@ -1,5 +1,3 @@
-import type { RehearsalState } from '../types';
-
 interface SettingsDrawerProps {
   isOpen: boolean;
   onClose: () => void;
@@ -26,7 +24,6 @@ interface SettingsDrawerProps {
   onOpenJumpMenu: () => void;
   // Stats
   runStats: { accuracy: number; avgTime: number; stumbles: number };
-  state: RehearsalState;
   // PWA
   isPWAInstallable?: boolean;
   onInstall?: () => void;
