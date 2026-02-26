@@ -7,6 +7,7 @@ class TTSEngine {
   private _volume: number = 1.0;
   private voicesLoaded: boolean = false;
   private voicesLoadedPromise: Promise<void>;
+  private speakTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     this.synth = window.speechSynthesis;
@@ -72,7 +73,11 @@ class TTSEngine {
       // Chrome race condition: cancel() then immediate speak() causes the new
       // utterance to receive an 'interrupted' error instantly. A short delay
       // lets Chrome finish processing the cancel before accepting new speech.
-      setTimeout(() => { this.synth.speak(utterance); }, 50);
+      if (this.speakTimer !== null) clearTimeout(this.speakTimer);
+      this.speakTimer = setTimeout(() => {
+        this.speakTimer = null;
+        this.synth.speak(utterance);
+      }, 50);
     });
   }
 
