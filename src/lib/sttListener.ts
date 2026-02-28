@@ -14,6 +14,7 @@ class STTListener {
   private suppressNextEnd: boolean = false;
   private hadSpeech: boolean = false;
   private speechEndTimer: ReturnType<typeof setTimeout> | null = null;
+  private listenStartTime: number = 0;
 
   constructor() {
     const SpeechRecognition =
@@ -68,15 +69,20 @@ class STTListener {
           return;
         }
         if (!this.hadSpeech) {
-          // No speech detected — advance immediately (no point waiting)
-          this.callbacks.onSpeechEnd?.();
+          // No speech detected — wait until minimum listen floor has passed
+          // to prevent lines from being skipped before user opens their mouth.
+          const elapsed = Date.now() - this.listenStartTime;
+          const remaining = Math.max(0, 2500 - elapsed);
+          setTimeout(() => {
+            this.callbacks.onSpeechEnd?.();
+          }, remaining);
           return;
         }
         // Speech was detected — wait 1500ms grace period before advancing,
         // in case the user paused mid-sentence.
-        this.hadSpeech = false;
         if (this.speechEndTimer) clearTimeout(this.speechEndTimer);
         this.speechEndTimer = setTimeout(() => {
+          this.hadSpeech = false;
           this.speechEndTimer = null;
           this.callbacks.onSpeechEnd?.();
         }, 1500);
@@ -107,6 +113,7 @@ class STTListener {
     if (!this.recognition) return;
     if (this.isListening) return;
     try {
+      this.listenStartTime = Date.now();
       this.recognition.start();
     } catch {
       // Already started
