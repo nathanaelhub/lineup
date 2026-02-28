@@ -159,6 +159,7 @@ export function SetupScreen({ script, onStart, onBack, isDarkMode, onToggleDark 
         <div>
           <button
             onClick={() => setAdvancedOpen(v => !v)}
+            aria-expanded={advancedOpen}
             className={`w-full flex items-center justify-center gap-1.5 py-2 text-xs transition-colors ${textMuted} ${hoverBg} rounded-xl`}
           >
             Advanced settings {advancedOpen ? '▲' : '▾'}
@@ -276,12 +277,12 @@ function ScreenplayLine({
         {isMe ? (
           previewMode === 'blackout' ? (
             <div
-              className="h-[1.1em] rounded-sm bg-gray-900 mt-1"
+              className={`h-[1.1em] rounded-sm ${isDarkMode ? 'bg-text-primary/80' : 'bg-gray-900'} mt-1`}
               style={{ width: `${barWidth}%` }}
               aria-label="[your line]"
             />
           ) : (
-            <p className={`text-sm leading-relaxed bg-yellow-200 text-gray-900 rounded px-1 inline-block`}>
+            <p className={`text-sm leading-relaxed ${isDarkMode ? 'bg-yellow-400/20 text-text-primary' : 'bg-yellow-200 text-gray-900'} rounded px-1 inline-block`}>
               {line.text}
             </p>
           )
@@ -314,7 +315,7 @@ function ToggleOption({ label, description, checked, onChange, isDarkMode }: {
         <p className={`text-sm font-medium ${textPrimary}`}>{label}</p>
         <p className={`text-xs ${textMuted} mt-0.5`}>{description}</p>
       </div>
-      <div className={`w-10 h-6 rounded-full relative transition-colors duration-200 ${checked ? 'bg-accent' : 'bg-bg-tertiary'}`}>
+      <div className={`w-10 h-6 rounded-full relative transition-colors duration-200 ${checked ? 'bg-accent' : isDarkMode ? 'bg-bg-tertiary' : 'bg-gray-200'}`}>
         <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${checked ? 'translate-x-5' : 'translate-x-1'}`} />
       </div>
     </button>
