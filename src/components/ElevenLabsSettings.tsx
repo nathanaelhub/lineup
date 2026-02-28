@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import type { ElevenLabsVoice, ElevenLabsConfig } from '../types';
 import { fetchElevenLabsVoices, getStoredApiKey, storeApiKey } from '../lib/elevenLabsEngine';
+import { guessGender } from '../utils/genderFromName';
 
 interface ElevenLabsSettingsProps {
   characters: string[];
@@ -27,11 +28,31 @@ export function ElevenLabsSettings({ characters, config, onChange }: ElevenLabsS
       setVoices(fetched);
       storeApiKey(apiKey.trim());
 
-      // Auto-assign first N voices to characters
+      // Auto-assign voices by matching character name gender to voice gender.
       const autoMap: Record<string, string> = {};
-      characters.forEach((char, i) => {
-        if (fetched[i]) autoMap[char] = fetched[i].voice_id;
+      const maleVoices = fetched.filter(v => v.gender === 'male');
+      const femaleVoices = fetched.filter(v => v.gender === 'female');
+      const ungenderedVoices = fetched.filter(v => !v.gender);
+      let maleIdx = 0, femaleIdx = 0, anyIdx = 0;
+
+      characters.forEach(char => {
+        const gender = guessGender(char);
+        if (gender === 'female' && femaleVoices.length > 0) {
+          autoMap[char] = femaleVoices[femaleIdx % femaleVoices.length].voice_id;
+          femaleIdx++;
+        } else if (gender === 'male' && maleVoices.length > 0) {
+          autoMap[char] = maleVoices[maleIdx % maleVoices.length].voice_id;
+          maleIdx++;
+        } else {
+          // Unknown gender or no matching pool — cycle through all voices
+          const fallback = [...maleVoices, ...femaleVoices, ...ungenderedVoices];
+          if (fallback.length > 0) {
+            autoMap[char] = fallback[anyIdx % fallback.length].voice_id;
+            anyIdx++;
+          }
+        }
       });
+
       setCharacterVoiceMap(prev => ({ ...autoMap, ...prev }));
 
       onChange({
@@ -146,7 +167,7 @@ export function ElevenLabsSettings({ characters, config, onChange }: ElevenLabsS
                 <option value="">Browser voice</option>
                 {voices.map(v => (
                   <option key={v.voice_id} value={v.voice_id}>
-                    {v.name}{v.category ? ` (${v.category})` : ''}
+                    {v.name}{v.gender ? ` · ${v.gender}` : v.category ? ` (${v.category})` : ''}
                   </option>
                 ))}
               </select>

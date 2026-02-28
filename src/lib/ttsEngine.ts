@@ -65,18 +65,37 @@ class TTSEngine {
       utterance.rate = config?.rate ?? this._rate;
       utterance.pitch = config?.pitch ?? 1.0;
       utterance.volume = config?.volume ?? this._volume;
-      utterance.onend = () => { resolve(); };
+
+      // Watchdog: Chrome can get stuck speaking (onend never fires).
+      // Estimate generous duration: chars / 12 chars-per-sec at rate=1, plus 4s buffer.
+      const estMs = Math.max(8000, (text.length / 12) * (1 / utterance.rate) * 1000 + 4000);
+      let watchdog: ReturnType<typeof setTimeout> | null = null;
+
+      utterance.onend = () => {
+        if (watchdog) { clearTimeout(watchdog); watchdog = null; }
+        resolve();
+      };
       utterance.onerror = (e) => {
+        if (watchdog) { clearTimeout(watchdog); watchdog = null; }
         if (e.error === 'interrupted' || e.error === 'canceled') { resolve(); }
         else { reject(e); }
       };
+
       // Chrome race condition: cancel() then immediate speak() causes the new
       // utterance to receive an 'interrupted' error instantly. A short delay
       // lets Chrome finish processing the cancel before accepting new speech.
       if (this.speakTimer !== null) clearTimeout(this.speakTimer);
       this.speakTimer = setTimeout(() => {
         this.speakTimer = null;
+        // Unstick Chrome if synthesis was left in a paused/broken state.
+        if (this.synth.paused) this.synth.resume();
         this.synth.speak(utterance);
+        // Start watchdog after speak is queued.
+        watchdog = setTimeout(() => {
+          watchdog = null;
+          this.synth.cancel();
+          resolve();
+        }, estMs);
       }, 50);
     });
   }

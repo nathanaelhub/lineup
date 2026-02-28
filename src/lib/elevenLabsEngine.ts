@@ -17,11 +17,18 @@ export async function fetchElevenLabsVoices(apiKey: string): Promise<ElevenLabsV
     throw new Error(message);
   }
   const data = await res.json();
-  return (data.voices as any[]).map(v => ({
-    voice_id: v.voice_id,
-    name: v.name,
-    category: v.category,
-  }));
+  return (data.voices as any[]).map(v => {
+    const gender: 'male' | 'female' | undefined =
+      typeof v.labels?.gender === 'string'
+        ? v.labels.gender.toLowerCase().startsWith('f') ? 'female' : 'male'
+        : undefined;
+    return {
+      voice_id: v.voice_id,
+      name: v.name,
+      category: v.category,
+      gender,
+    };
+  });
 }
 
 let currentAudio: HTMLAudioElement | null = null;

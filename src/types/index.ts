@@ -27,6 +27,7 @@ export interface ElevenLabsVoice {
   voice_id: string;
   name: string;
   category?: string;
+  gender?: 'male' | 'female';
 }
 
 export interface ElevenLabsConfig {

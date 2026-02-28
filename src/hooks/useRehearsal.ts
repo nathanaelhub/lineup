@@ -117,6 +117,7 @@ export function useRehearsal(config: SessionConfig | null) {
     }
 
     const line = currentLines[index];
+    currentIndexRef.current = index; // Sync immediately so skip/back see the right index
     setCurrentIndex(index);
     stopTimer();
     lineElapsedRef.current = 0;
@@ -182,7 +183,7 @@ export function useRehearsal(config: SessionConfig | null) {
       generationRef.current++;
       tts.resume();
       setState('PLAYING_OTHER');
-      processLine(currentIndex);
+      processLine(currentIndexRef.current);
       return;
     }
     generationRef.current++;
@@ -207,13 +208,13 @@ export function useRehearsal(config: SessionConfig | null) {
     stopElevenLabsAudio();
     stt.stopListening();
     stopTimer();
-    const next = currentIndex + 1;
-    if (next < lines.length) {
+    const next = currentIndexRef.current + 1;
+    if (next < linesRef.current.length) {
       processLine(next);
     } else {
       setState('COMPLETE');
     }
-  }, [currentIndex, lines.length, tts, stt, stopTimer, processLine]);
+  }, [tts, stt, stopTimer, processLine]);
 
   const back = useCallback(() => {
     generationRef.current++;
@@ -221,9 +222,9 @@ export function useRehearsal(config: SessionConfig | null) {
     stopElevenLabsAudio();
     stt.stopListening();
     stopTimer();
-    const prev = Math.max(0, currentIndex - 1);
+    const prev = Math.max(0, currentIndexRef.current - 1);
     processLine(prev);
-  }, [currentIndex, tts, stt, stopTimer, processLine]);
+  }, [tts, stt, stopTimer, processLine]);
 
   const goToLine = useCallback((index: number) => {
     generationRef.current++;
@@ -264,8 +265,8 @@ export function useRehearsal(config: SessionConfig | null) {
       lineStatsRef.current.push({ score, elapsed: lineElapsedRef.current });
     }
     stt.stopListening();
-    processLine(currentIndex + 1);
-  }, [currentIndex, stt, processLine]);
+    processLine(currentIndexRef.current + 1);
+  }, [stt, processLine]);
 
   const toggleOffBook = useCallback(() => setOffBook(prev => !prev), []);
   const toggleAutoAdvance = useCallback(() => setAutoAdvance(prev => !prev), []);
