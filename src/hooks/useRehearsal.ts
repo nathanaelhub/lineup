@@ -33,6 +33,7 @@ export function useRehearsal(config: SessionConfig | null) {
 
   const stateRef = useRef(state);
   stateRef.current = state;
+  const generationRef = useRef(0);
   const currentIndexRef = useRef(currentIndex);
   currentIndexRef.current = currentIndex;
   const linesRef = useRef(lines);
@@ -96,6 +97,8 @@ export function useRehearsal(config: SessionConfig | null) {
   }, [tts]);
 
   const processLine = useCallback(async (index: number) => {
+    const gen = generationRef.current;
+
     // Loop wrap: if both markers are set and we've passed B, jump back to A
     const ls = loopStartRef.current;
     const le = loopEndRef.current;
@@ -122,13 +125,18 @@ export function useRehearsal(config: SessionConfig | null) {
     if (isDirection(line)) {
       setState('PLAYING_OTHER');
       await new Promise(resolve => setTimeout(resolve, 1500));
-      if (stateRef.current === 'PAUSED') return;
+      if (generationRef.current !== gen) return;
       processLine(index + 1);
       return;
     }
 
     if (isOtherLine(line, currentConfig.myCharacter)) {
       setState('PLAYING_OTHER');
+      if (currentConfig.ttsEnabled === false) {
+        // TTS off: display line and wait for user to advance manually
+        startTimer();
+        return;
+      }
       startTimer();
       try {
         await speakLine(line.text, line.character);
@@ -136,7 +144,7 @@ export function useRehearsal(config: SessionConfig | null) {
         // TTS error — continue
       }
       stopTimer();
-      if (stateRef.current === 'PAUSED') return;
+      if (generationRef.current !== gen) return;
       processLine(index + 1);
       return;
     }
@@ -147,8 +155,10 @@ export function useRehearsal(config: SessionConfig | null) {
       startTimer();
       if (autoAdvanceRef.current && stt.isSupported) {
         setTimeout(() => {
+          if (generationRef.current !== gen) return;
           if (stateRef.current !== 'WAITING_FOR_USER') return;
           stt.startListening(() => {
+            if (generationRef.current !== gen) return;
             const heard = stt.transcriptRef.current;
             let score = -1;
             if (heard) {
@@ -169,11 +179,13 @@ export function useRehearsal(config: SessionConfig | null) {
 
   const play = useCallback(() => {
     if (state === 'PAUSED') {
+      generationRef.current++;
       tts.resume();
       setState('PLAYING_OTHER');
       processLine(currentIndex);
       return;
     }
+    generationRef.current++;
     const isFirstPlay = runCount === 0;
     setRunCount(prev => prev + 1);
     const start = isFirstPlay ? (configRef.current?.startIndex ?? 0) : 0;
@@ -181,6 +193,7 @@ export function useRehearsal(config: SessionConfig | null) {
   }, [state, currentIndex, processLine, tts]);
 
   const pause = useCallback(() => {
+    generationRef.current++;
     tts.stop();
     stopElevenLabsAudio();
     stt.stopListening();
@@ -189,6 +202,7 @@ export function useRehearsal(config: SessionConfig | null) {
   }, [tts, stt, stopTimer]);
 
   const skip = useCallback(() => {
+    generationRef.current++;
     tts.stop();
     stopElevenLabsAudio();
     stt.stopListening();
@@ -202,6 +216,7 @@ export function useRehearsal(config: SessionConfig | null) {
   }, [currentIndex, lines.length, tts, stt, stopTimer, processLine]);
 
   const back = useCallback(() => {
+    generationRef.current++;
     tts.stop();
     stopElevenLabsAudio();
     stt.stopListening();
@@ -211,6 +226,7 @@ export function useRehearsal(config: SessionConfig | null) {
   }, [currentIndex, tts, stt, stopTimer, processLine]);
 
   const goToLine = useCallback((index: number) => {
+    generationRef.current++;
     tts.stop();
     stopElevenLabsAudio();
     stt.stopListening();
@@ -219,6 +235,7 @@ export function useRehearsal(config: SessionConfig | null) {
   }, [lines.length, tts, stt, stopTimer, processLine]);
 
   const restart = useCallback(() => {
+    generationRef.current++;
     tts.stop();
     stopElevenLabsAudio();
     stt.stopListening();
@@ -235,6 +252,7 @@ export function useRehearsal(config: SessionConfig | null) {
   }, [tts, stt, stopTimer]);
 
   const advance = useCallback(() => {
+    generationRef.current++;
     const currentLine = linesRef.current[currentIndexRef.current];
     if (currentLine && isMyLine(currentLine, configRef.current?.myCharacter || '')) {
       const heard = stt.transcriptRef.current;

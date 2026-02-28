@@ -43,6 +43,7 @@ export interface SessionConfig {
   showDirections: boolean;
   cueMode: boolean;
   speed: number;
+  ttsEnabled: boolean;
   startIndex?: number;
   elevenLabs?: ElevenLabsConfig;
   characterPitchMap?: Record<string, number>;

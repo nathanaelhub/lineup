@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import type { ParsedScript, SessionConfig, ElevenLabsConfig, ScriptLine } from '../types';
+import type { ParsedScript, SessionConfig, ElevenLabsConfig } from '../types';
 import { ElevenLabsSettings } from './ElevenLabsSettings';
 import { getCharacterColor } from '../utils/voiceMapper';
 import { getPosition } from '../utils/storage';
+import { ScriptView } from './ScriptView';
 
 interface SetupScreenProps {
   script: ParsedScript;
@@ -19,12 +20,11 @@ export function SetupScreen({ script, onStart, onBack, isDarkMode, onToggleDark 
   const [showDirections, setShowDirections] = useState(true);
   const [speed, setSpeed] = useState(1.0);
   const [cueMode, setCueMode] = useState(false);
+  const [ttsEnabled, setTtsEnabled] = useState(true);
   const [elevenLabs, setElevenLabs] = useState<ElevenLabsConfig | undefined>();
   const [characterPitchMap, setCharacterPitchMap] = useState<Record<string, number>>({});
-  const [previewMode, setPreviewMode] = useState<'blackout' | 'highlight'>(() => {
-    return (localStorage.getItem('lineup-preview-mode') as 'blackout' | 'highlight') || 'blackout';
-  });
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [scriptViewOpen, setScriptViewOpen] = useState(false);
 
   const justMyCues = cueMode && offBook;
   const handleJustMyCues = (val: boolean) => {
@@ -35,16 +35,26 @@ export function SetupScreen({ script, onStart, onBack, isDarkMode, onToggleDark 
   const savedPosition = myCharacter ? getPosition(script.title) : null;
   const resumeAvailable = savedPosition && savedPosition.character === myCharacter && savedPosition.lineIndex > 0;
 
+  const startConfig = (startIndex?: number): SessionConfig => ({
+    script,
+    myCharacter: myCharacter!,
+    autoAdvance,
+    offBook,
+    showDirections,
+    cueMode,
+    speed,
+    ttsEnabled,
+    elevenLabs,
+    characterPitchMap,
+    ...(startIndex !== undefined ? { startIndex } : {}),
+  });
+
   // Theme helpers
   const bg = isDarkMode ? 'bg-bg-primary' : 'bg-white';
   const surface = isDarkMode ? 'bg-bg-secondary' : 'bg-gray-50';
-  const border = isDarkMode ? 'border-bg-tertiary' : 'border-gray-200';
   const textPrimary = isDarkMode ? 'text-text-primary' : 'text-gray-900';
   const textMuted = isDarkMode ? 'text-text-muted' : 'text-gray-500';
-  const textSecondary = isDarkMode ? 'text-text-secondary' : 'text-gray-600';
   const hoverBg = isDarkMode ? 'hover:bg-bg-tertiary' : 'hover:bg-gray-100';
-  const pill = isDarkMode ? 'bg-bg-secondary border-bg-tertiary text-text-secondary' : 'bg-gray-100 border-gray-200 text-gray-700';
-  const pillActive = isDarkMode ? 'bg-accent text-white border-accent' : 'bg-gray-900 text-white border-gray-900';
 
   return (
     <div className={`h-full flex flex-col overflow-y-auto ${bg}`}>
@@ -84,57 +94,80 @@ export function SetupScreen({ script, onStart, onBack, isDarkMode, onToggleDark 
         </div>
 
         {/* Character picker */}
-        <div className="space-y-2">
+        <div className="space-y-3">
           <p className={`text-xs font-medium uppercase tracking-wider ${textMuted}`}>Who are you playing?</p>
-          <div className="flex flex-wrap gap-2">
-            {script.characters.map(char => (
-              <button
-                key={char}
-                onClick={() => setMyCharacter(char)}
-                className={`px-4 py-2 rounded-full border text-sm font-medium transition-all active:scale-95
-                  ${myCharacter === char ? pillActive : pill}`}
-              >
-                {char}
-              </button>
-            ))}
+          <div className="grid grid-cols-2 gap-2">
+            {script.characters.map(char => {
+              const color = getCharacterColor(char, script.characters);
+              const isSelected = myCharacter === char;
+              return (
+                <button
+                  key={char}
+                  onClick={() => setMyCharacter(char)}
+                  className={`flex items-center gap-3 px-4 py-4 rounded-2xl border text-left transition-all active:scale-[0.97]
+                    ${isSelected
+                      ? isDarkMode
+                        ? 'bg-accent/10 border-accent text-text-primary'
+                        : 'bg-gray-900 border-gray-900 text-white'
+                      : isDarkMode
+                        ? 'bg-bg-secondary border-bg-tertiary text-text-secondary hover:bg-bg-tertiary'
+                        : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
+                    }`}
+                >
+                  {/* Color swatch */}
+                  <div
+                    className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-white text-xs font-bold"
+                    style={{ backgroundColor: isSelected && !isDarkMode ? 'rgba(255,255,255,0.25)' : color }}
+                  >
+                    {char.charAt(0)}
+                  </div>
+                  <span className="text-sm font-semibold truncate">{char}</span>
+                  {isSelected && (
+                    <svg className="ml-auto shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* Script preview — only show after character is selected */}
+        {/* Voice toggle + Preview script button — shown after character selected */}
         {myCharacter && (
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <p className={`text-xs font-medium uppercase tracking-wider ${textMuted}`}>Script</p>
-              <button
-                onClick={() => {
-                  const next = previewMode === 'blackout' ? 'highlight' : 'blackout';
-                  localStorage.setItem('lineup-preview-mode', next);
-                  setPreviewMode(next);
-                }}
-                className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${border} ${textMuted} ${hoverBg}`}
-              >
-                {previewMode === 'blackout' ? '⬛ Blackout' : '🟡 Highlight'}
-              </button>
-            </div>
-            <div className={`rounded-2xl border ${border} ${surface} overflow-y-auto max-h-[42vh] px-5 py-4 space-y-3`}>
-              {script.lines.map(line => (
-                <ScreenplayLine
-                  key={line.lineIndex}
-                  line={line}
-                  myCharacter={myCharacter}
-                  characters={script.characters}
-                  previewMode={previewMode}
-                  isDarkMode={isDarkMode}
-                />
-              ))}
-            </div>
+            <ToggleOption
+              label="Voice"
+              description="Read other characters' lines aloud"
+              checked={ttsEnabled}
+              onChange={setTtsEnabled}
+              isDarkMode={isDarkMode}
+            />
+            <button
+              onClick={() => setScriptViewOpen(true)}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors text-left
+                ${isDarkMode ? 'bg-bg-secondary border-bg-tertiary hover:bg-bg-tertiary' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={textMuted}>
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+              </svg>
+              <div className="flex-1">
+                <p className={`text-sm font-medium ${textPrimary}`}>Preview Script</p>
+                <p className={`text-xs ${textMuted}`}>See full script with your lines blacked out</p>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={textMuted}>
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
+            </button>
           </div>
         )}
 
         {/* Resume button */}
         {resumeAvailable && (
           <button
-            onClick={() => onStart({ script, myCharacter: myCharacter!, autoAdvance, offBook, showDirections, cueMode, speed, startIndex: savedPosition!.lineIndex, elevenLabs, characterPitchMap })}
+            onClick={() => onStart(startConfig(savedPosition!.lineIndex))}
             className="w-full py-3 rounded-2xl border border-accent/40 text-accent text-sm font-medium hover:bg-accent/10 transition-all active:scale-[0.98] text-center"
           >
             Resume from line {savedPosition!.lineIndex + 1} →
@@ -143,7 +176,7 @@ export function SetupScreen({ script, onStart, onBack, isDarkMode, onToggleDark 
 
         {/* Start button */}
         <button
-          onClick={() => { if (myCharacter) onStart({ script, myCharacter, autoAdvance, offBook, showDirections, cueMode, speed, elevenLabs, characterPitchMap }); }}
+          onClick={() => { if (myCharacter) onStart(startConfig()); }}
           disabled={!myCharacter}
           className={`w-full py-4 rounded-2xl text-lg font-semibold transition-all active:scale-[0.98]
             disabled:opacity-40 disabled:cursor-not-allowed
@@ -193,8 +226,8 @@ export function SetupScreen({ script, onStart, onBack, isDarkMode, onToggleDark 
                 </div>
               </div>
 
-              {/* Voice Pitch */}
-              {!elevenLabs?.apiKey && myCharacter && script.characters.filter(c => c !== myCharacter).length > 0 && (
+              {/* Voice Pitch — only when TTS is enabled */}
+              {ttsEnabled && !elevenLabs?.apiKey && myCharacter && script.characters.filter(c => c !== myCharacter).length > 0 && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between px-1">
                     <span className={`text-sm ${textPrimary}`}>Voice Pitch</span>
@@ -202,7 +235,7 @@ export function SetupScreen({ script, onStart, onBack, isDarkMode, onToggleDark 
                   </div>
                   {script.characters.filter(c => c !== myCharacter).map(char => (
                     <div key={char} className={`flex items-center gap-3 ${surface} rounded-xl px-4 py-2.5`}>
-                      <span className={`text-xs font-medium ${textSecondary} min-w-0 flex-1 truncate`}>{char}</span>
+                      <span className={`text-xs font-medium ${isDarkMode ? 'text-text-secondary' : 'text-gray-600'} min-w-0 flex-1 truncate`}>{char}</span>
                       <input
                         type="range" min={0.5} max={2.0} step={0.1}
                         value={characterPitchMap[char] ?? 1.0}
@@ -232,14 +265,53 @@ export function SetupScreen({ script, onStart, onBack, isDarkMode, onToggleDark 
         </div>
 
       </div>
+
+      {/* Full-page script preview overlay */}
+      {scriptViewOpen && myCharacter && (
+        <ScriptView
+          lines={script.lines}
+          myCharacter={myCharacter}
+          characters={script.characters}
+          onClose={() => setScriptViewOpen(false)}
+        />
+      )}
     </div>
   );
 }
 
-function ScreenplayLine({
+function ToggleOption({ label, description, checked, onChange, isDarkMode }: {
+  label: string;
+  description: string;
+  checked: boolean;
+  onChange: (val: boolean) => void;
+  isDarkMode: boolean;
+}) {
+  const textPrimary = isDarkMode ? 'text-text-primary' : 'text-gray-900';
+  const textMuted = isDarkMode ? 'text-text-muted' : 'text-gray-500';
+  const surface = isDarkMode ? 'bg-bg-secondary' : 'bg-gray-50';
+  const hoverBg = isDarkMode ? 'hover:bg-bg-tertiary' : 'hover:bg-gray-100';
+
+  return (
+    <button
+      onClick={() => onChange(!checked)}
+      className={`w-full flex items-center justify-between px-4 py-3 rounded-xl ${surface} ${hoverBg} transition-colors`}
+    >
+      <div className="text-left">
+        <p className={`text-sm font-medium ${textPrimary}`}>{label}</p>
+        <p className={`text-xs ${textMuted} mt-0.5`}>{description}</p>
+      </div>
+      <div className={`w-10 h-6 rounded-full relative transition-colors duration-200 ${checked ? 'bg-accent' : isDarkMode ? 'bg-bg-tertiary' : 'bg-gray-200'}`}>
+        <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${checked ? 'translate-x-5' : 'translate-x-1'}`} />
+      </div>
+    </button>
+  );
+}
+
+// ScreenplayLine kept for potential future use but removed from main flow
+export function ScreenplayLine({
   line, myCharacter, characters, previewMode, isDarkMode,
 }: {
-  line: ScriptLine;
+  line: import('../types').ScriptLine;
   myCharacter: string;
   characters: string[];
   previewMode: 'blackout' | 'highlight';
@@ -291,33 +363,5 @@ function ScreenplayLine({
         )}
       </div>
     </div>
-  );
-}
-
-function ToggleOption({ label, description, checked, onChange, isDarkMode }: {
-  label: string;
-  description: string;
-  checked: boolean;
-  onChange: (val: boolean) => void;
-  isDarkMode: boolean;
-}) {
-  const textPrimary = isDarkMode ? 'text-text-primary' : 'text-gray-900';
-  const textMuted = isDarkMode ? 'text-text-muted' : 'text-gray-500';
-  const surface = isDarkMode ? 'bg-bg-secondary' : 'bg-gray-50';
-  const hoverBg = isDarkMode ? 'hover:bg-bg-tertiary' : 'hover:bg-gray-100';
-
-  return (
-    <button
-      onClick={() => onChange(!checked)}
-      className={`w-full flex items-center justify-between px-4 py-3 rounded-xl ${surface} ${hoverBg} transition-colors`}
-    >
-      <div className="text-left">
-        <p className={`text-sm font-medium ${textPrimary}`}>{label}</p>
-        <p className={`text-xs ${textMuted} mt-0.5`}>{description}</p>
-      </div>
-      <div className={`w-10 h-6 rounded-full relative transition-colors duration-200 ${checked ? 'bg-accent' : isDarkMode ? 'bg-bg-tertiary' : 'bg-gray-200'}`}>
-        <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${checked ? 'translate-x-5' : 'translate-x-1'}`} />
-      </div>
-    </button>
   );
 }

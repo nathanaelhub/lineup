@@ -65,7 +65,8 @@ export function RehearsalScreen({ config, onExit, installPrompt, onInstall }: Re
   }, [handleKeyDown]);
 
   return (
-    <div className="h-full flex flex-col bg-bg-primary">
+    <div className="h-full flex flex-col bg-bg-primary items-center">
+    <div className="h-full flex flex-col w-full max-w-lg">
       {/* Jump menu overlay */}
       {jumpMenuOpen && (
         <ScriptJumpMenu
@@ -216,6 +217,7 @@ export function RehearsalScreen({ config, onExit, installPrompt, onInstall }: Re
           onClose={() => setScriptViewOpen(false)}
         />
       )}
+    </div>
     </div>
   );
 }
