@@ -110,24 +110,31 @@ export function HomeScreen({ savedScripts, onUpload, onLoadSaved, onDeleteSaved,
 
         {/* Paste option */}
         <div className="w-full mt-6">
-          <PasteArea onUpload={onUpload} />
+          <PasteArea onUpload={onUpload} isDarkMode={isDarkMode} />
         </div>
       </div>
     </div>
   );
 }
 
-function PasteArea({ onUpload }: { onUpload: (text: string, filename: string) => void }) {
+function PasteArea({ onUpload, isDarkMode }: { onUpload: (text: string, filename: string) => void; isDarkMode: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
   const [text, setText] = useState('');
+
+  const textMuted = isDarkMode ? 'text-text-muted' : 'text-gray-400';
+  const textSecondary = isDarkMode ? 'text-text-secondary' : 'text-gray-600';
+  const textPrimary = isDarkMode ? 'text-text-primary' : 'text-gray-900';
+  const borderTertiary = isDarkMode ? 'border-bg-tertiary' : 'border-gray-200';
+  const surface = isDarkMode ? 'bg-bg-secondary' : 'bg-gray-50';
+  const surfaceTertiary = isDarkMode ? 'bg-bg-tertiary' : 'bg-gray-100';
 
   if (!isOpen) {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="w-full py-3 text-center text-text-muted text-sm
-          hover:text-text-secondary transition-colors rounded-xl
-          border border-dashed border-bg-tertiary hover:border-text-muted"
+        className={`w-full py-3 text-center ${textMuted} text-sm
+          hover:${textSecondary} transition-colors rounded-xl
+          border border-dashed ${borderTertiary} hover:border-text-muted`}
       >
         Or paste script text directly
       </button>
@@ -146,16 +153,16 @@ Their dialogue goes here.
 
 ANOTHER CHARACTER
 Their response..."
-        className="w-full h-48 bg-bg-secondary border border-bg-tertiary rounded-xl p-4
-          text-sm text-text-primary placeholder:text-text-muted/50 resize-none
-          focus:outline-none focus:border-accent/50 transition-colors"
+        className={`w-full h-48 ${surface} border ${borderTertiary} rounded-xl p-4
+          text-sm ${textPrimary} placeholder:${textMuted}/50 resize-none
+          focus:outline-none focus:border-accent/50 transition-colors`}
         autoFocus
       />
       <div className="flex gap-2">
         <button
           onClick={() => { setIsOpen(false); setText(''); }}
-          className="flex-1 py-2.5 rounded-xl bg-bg-tertiary text-text-secondary text-sm
-            hover:bg-bg-tertiary/80 transition-colors"
+          className={`flex-1 py-2.5 rounded-xl ${surfaceTertiary} ${textSecondary} text-sm
+            hover:${surfaceTertiary}/80 transition-colors`}
         >
           Cancel
         </button>
