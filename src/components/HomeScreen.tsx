@@ -7,9 +7,11 @@ interface HomeScreenProps {
   onUpload: (text: string, filename: string) => void;
   onLoadSaved: (script: SavedScript) => void;
   onDeleteSaved: (id: string) => void;
+  isDarkMode: boolean;
+  onToggleDark: () => void;
 }
 
-export function HomeScreen({ savedScripts, onUpload, onLoadSaved, onDeleteSaved }: HomeScreenProps) {
+export function HomeScreen({ savedScripts, onUpload, onLoadSaved, onDeleteSaved, isDarkMode: _isDarkMode, onToggleDark: _onToggleDark }: HomeScreenProps) {
   return (
     <div className="h-full flex flex-col overflow-y-auto">
       <div className="flex-1 flex flex-col items-center justify-start px-6 py-10 max-w-lg mx-auto w-full">

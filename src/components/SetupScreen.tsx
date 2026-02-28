@@ -10,9 +10,11 @@ interface SetupScreenProps {
   script: ParsedScript;
   onStart: (config: SessionConfig) => void;
   onBack: () => void;
+  isDarkMode: boolean;
+  onToggleDark: () => void;
 }
 
-export function SetupScreen({ script: initialScript, onStart, onBack }: SetupScreenProps) {
+export function SetupScreen({ script: initialScript, onStart, onBack, isDarkMode: _isDarkMode, onToggleDark: _onToggleDark }: SetupScreenProps) {
   const [script, setScript] = useState(initialScript);
   const [myCharacter, setMyCharacter] = useState<string | null>(null);
   const [autoAdvance, setAutoAdvance] = useState(true);

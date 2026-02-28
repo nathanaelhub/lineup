@@ -17,6 +17,18 @@ function App() {
   const [savedScripts, setSavedScripts] = useState<SavedScript[]>(() => getSavedScripts());
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
 
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    return localStorage.getItem('lineup-theme') === 'dark';
+  });
+
+  const toggleDarkMode = useCallback(() => {
+    setIsDarkMode(prev => {
+      const next = !prev;
+      localStorage.setItem('lineup-theme', next ? 'dark' : 'light');
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     const handler = (e: Event) => {
       e.preventDefault();
@@ -74,6 +86,8 @@ function App() {
           onUpload={handleUpload}
           onLoadSaved={handleLoadSaved}
           onDeleteSaved={handleDeleteSaved}
+          isDarkMode={isDarkMode}
+          onToggleDark={toggleDarkMode}
         />
       )}
       {screen === 'setup' && parsedScript && (
@@ -81,6 +95,8 @@ function App() {
           script={parsedScript}
           onStart={handleStartRehearsal}
           onBack={handleBackToHome}
+          isDarkMode={isDarkMode}
+          onToggleDark={toggleDarkMode}
         />
       )}
       {screen === 'rehearsal' && sessionConfig && (
