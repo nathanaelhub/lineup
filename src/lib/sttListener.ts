@@ -14,6 +14,7 @@ class STTListener {
   private suppressNextEnd: boolean = false;
   private hadSpeech: boolean = false;
   private speechEndTimer: ReturnType<typeof setTimeout> | null = null;
+  private floorTimer: ReturnType<typeof setTimeout> | null = null;
   private listenStartTime: number = 0;
 
   constructor() {
@@ -29,6 +30,7 @@ class STTListener {
 
       this.recognition.onstart = () => {
         this.isListening = true;
+        this.listenStartTime = Date.now();
       };
 
       this.recognition.onspeechstart = () => {
@@ -73,7 +75,10 @@ class STTListener {
           // to prevent lines from being skipped before user opens their mouth.
           const elapsed = Date.now() - this.listenStartTime;
           const remaining = Math.max(0, 2500 - elapsed);
-          setTimeout(() => {
+          if (this.floorTimer) clearTimeout(this.floorTimer);
+          this.floorTimer = setTimeout(() => {
+            this.floorTimer = null;
+            this.hadSpeech = false;
             this.callbacks.onSpeechEnd?.();
           }, remaining);
           return;
@@ -113,7 +118,6 @@ class STTListener {
     if (!this.recognition) return;
     if (this.isListening) return;
     try {
-      this.listenStartTime = Date.now();
       this.recognition.start();
     } catch {
       // Already started
@@ -124,6 +128,7 @@ class STTListener {
     if (!this.recognition) return;
     // Suppress the onend that recognition.stop() will fire asynchronously,
     // so it doesn't trigger a spurious onSpeechEnd → advance.
+    if (this.floorTimer) { clearTimeout(this.floorTimer); this.floorTimer = null; }
     if (this.speechEndTimer) { clearTimeout(this.speechEndTimer); this.speechEndTimer = null; }
     this.hadSpeech = false;
     this.suppressNextEnd = true;
