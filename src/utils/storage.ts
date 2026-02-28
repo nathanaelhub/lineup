@@ -1,4 +1,30 @@
-import type { SavedScript, ParsedScript, SavedPosition } from '../types';
+import type { SavedScript, ParsedScript, SavedPosition, ScriptLine } from '../types';
+
+// ── Line Corrections ───────────────────────────────────────────────────────────
+
+export interface LineCorrection {
+  type: ScriptLine['type'];
+  character?: string;
+}
+
+const CORRECTIONS_KEY = 'lineup_corrections';
+
+export function getCorrections(scriptTitle: string): Record<number, LineCorrection> {
+  try {
+    const raw = localStorage.getItem(`${CORRECTIONS_KEY}_${scriptTitle}`);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveCorrections(scriptTitle: string, corrections: Record<number, LineCorrection>): void {
+  if (Object.keys(corrections).length === 0) {
+    localStorage.removeItem(`${CORRECTIONS_KEY}_${scriptTitle}`);
+  } else {
+    localStorage.setItem(`${CORRECTIONS_KEY}_${scriptTitle}`, JSON.stringify(corrections));
+  }
+}
 
 const SCRIPTS_KEY = 'lineup_scripts';
 const POSITIONS_KEY = 'lineup_positions';

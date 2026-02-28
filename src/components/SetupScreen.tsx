@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import type { ParsedScript, SessionConfig, ElevenLabsConfig } from '../types';
 import { ElevenLabsSettings } from './ElevenLabsSettings';
 import { getCharacterColor } from '../utils/voiceMapper';
-import { getPosition } from '../utils/storage';
+import { getPosition, getCorrections, saveCorrections, type LineCorrection } from '../utils/storage';
 import { ScriptView } from './ScriptView';
 
 interface SetupScreenProps {
@@ -25,6 +25,26 @@ export function SetupScreen({ script, onStart, onBack, isDarkMode, onToggleDark 
   const [characterPitchMap, setCharacterPitchMap] = useState<Record<string, number>>({});
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [scriptViewOpen, setScriptViewOpen] = useState(false);
+  const [corrections, setCorrections] = useState<Record<number, LineCorrection>>(
+    () => getCorrections(script.title)
+  );
+
+  const correctedLines = useMemo(() =>
+    script.lines.map(line => {
+      const c = corrections[line.lineIndex];
+      if (!c) return line;
+      return { ...line, type: c.type, character: c.type === 'dialogue' ? (c.character ?? line.character) : undefined };
+    }),
+    [script.lines, corrections]
+  );
+
+  const handleCorrect = useCallback((lineIndex: number, correction: LineCorrection) => {
+    setCorrections(prev => {
+      const next = { ...prev, [lineIndex]: correction };
+      saveCorrections(script.title, next);
+      return next;
+    });
+  }, [script.title]);
 
   const justMyCues = cueMode && offBook;
   const handleJustMyCues = (val: boolean) => {
@@ -36,7 +56,7 @@ export function SetupScreen({ script, onStart, onBack, isDarkMode, onToggleDark 
   const resumeAvailable = savedPosition && savedPosition.character === myCharacter && savedPosition.lineIndex > 0;
 
   const startConfig = (startIndex?: number): SessionConfig => ({
-    script,
+    script: { ...script, lines: correctedLines },
     myCharacter: myCharacter!,
     autoAdvance,
     offBook,
@@ -273,10 +293,11 @@ export function SetupScreen({ script, onStart, onBack, isDarkMode, onToggleDark 
       {/* Full-page script preview overlay */}
       {scriptViewOpen && myCharacter && (
         <ScriptView
-          lines={script.lines}
+          lines={correctedLines}
           myCharacter={myCharacter}
           characters={script.characters}
           onClose={() => setScriptViewOpen(false)}
+          onCorrect={handleCorrect}
         />
       )}
     </div>
