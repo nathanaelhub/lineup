@@ -146,19 +146,22 @@ export function useRehearsal(config: SessionConfig | null) {
       setState('WAITING_FOR_USER');
       startTimer();
       if (autoAdvanceRef.current && stt.isSupported) {
-        stt.startListening(() => {
-          const heard = stt.transcriptRef.current;
-          let score = -1;
-          if (heard) {
-            const expected = linesRef.current[currentIndexRef.current]?.text || '';
-            score = compareTranscript(expected, heard);
-            setLastFeedback({ heard, score });
-          }
-          lineStatsRef.current.push({ score, elapsed: lineElapsedRef.current });
-          if (stateRef.current === 'WAITING_FOR_USER' || stateRef.current === 'USER_SPEAKING') {
-            processLine(currentIndexRef.current + 1);
-          }
-        });
+        setTimeout(() => {
+          if (stateRef.current !== 'WAITING_FOR_USER') return;
+          stt.startListening(() => {
+            const heard = stt.transcriptRef.current;
+            let score = -1;
+            if (heard) {
+              const expected = linesRef.current[currentIndexRef.current]?.text || '';
+              score = compareTranscript(expected, heard);
+              setLastFeedback({ heard, score });
+            }
+            lineStatsRef.current.push({ score, elapsed: lineElapsedRef.current });
+            if (stateRef.current === 'WAITING_FOR_USER' || stateRef.current === 'USER_SPEAKING') {
+              processLine(currentIndexRef.current + 1);
+            }
+          });
+        }, 200);
       }
       return;
     }
