@@ -94,8 +94,7 @@ export function HomeScreen({ savedScripts, onUpload, onLoadSaved, onDeleteSaved,
                       e.stopPropagation();
                       onDeleteSaved(script.id);
                     }}
-                    className="p-2 text-text-muted hover:text-error opacity-0 group-hover:opacity-100
-                      transition-all rounded-lg hover:bg-error/10"
+                    className="p-2 text-text-muted hover:text-error transition-colors rounded-lg hover:bg-error/10"
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="3 6 5 6 21 6" />

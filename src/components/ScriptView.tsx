@@ -32,9 +32,7 @@ export function ScriptView({ lines, myCharacter, characters, onClose, onCorrect 
           <p className="text-xs text-text-muted mt-0.5">
             {previewMode === 'blackout' ? 'Blacking out' : 'Highlighting'}:{' '}
             <span className="font-medium text-text-secondary">{myCharacter}</span>
-            {onCorrect && (
-              <span className="ml-2 text-accent">· tap ✏ to fix line types</span>
-            )}
+            {onCorrect && <span className="ml-2 text-accent/80">· tap a line to correct it</span>}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -56,7 +54,7 @@ export function ScriptView({ lines, myCharacter, characters, onClose, onCorrect 
       </div>
 
       {/* Script scroll */}
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-1 font-mono text-sm">
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-0.5 font-mono text-sm">
         {lines.map(line => (
           <ScriptLineRow
             key={line.lineIndex}
@@ -65,52 +63,69 @@ export function ScriptView({ lines, myCharacter, characters, onClose, onCorrect 
             characters={characters}
             previewMode={previewMode}
             isEditing={editingIndex === line.lineIndex}
-            onToggleEdit={() => setEditingIndex(prev => prev === line.lineIndex ? null : line.lineIndex)}
+            canEdit={!!onCorrect}
+            onTap={() => {
+              if (!onCorrect) return;
+              setEditingIndex(prev => prev === line.lineIndex ? null : line.lineIndex);
+            }}
             onCorrect={onCorrect ? (correction) => {
               onCorrect(line.lineIndex, correction);
-              setEditingIndex(null);
             } : undefined}
           />
         ))}
-        <div className="h-12" />
+        <div className="h-16" />
       </div>
     </div>
   );
 }
 
+function TypeBadge({ type }: { type: ScriptLine['type'] }) {
+  const label = type === 'scene_heading' ? 'HDG' : type === 'direction' ? 'DIR' : 'DLG';
+  const color = type === 'scene_heading'
+    ? 'text-purple-400 bg-purple-400/10'
+    : type === 'direction'
+    ? 'text-yellow-400 bg-yellow-400/10'
+    : 'text-blue-400 bg-blue-400/10';
+  return (
+    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${color} shrink-0 mt-0.5`}>
+      {label}
+    </span>
+  );
+}
+
 function ScriptLineRow({
-  line, myCharacter, characters, previewMode, isEditing, onToggleEdit, onCorrect,
+  line, myCharacter, characters, previewMode, isEditing, canEdit, onTap, onCorrect,
 }: {
   line: ScriptLine;
   myCharacter: string;
   characters: string[];
   previewMode: 'blackout' | 'highlight';
   isEditing: boolean;
-  onToggleEdit: () => void;
+  canEdit: boolean;
+  onTap: () => void;
   onCorrect?: (correction: LineCorrection) => void;
 }) {
   const isMe = line.character === myCharacter;
   const color = line.character ? getCharacterColor(line.character, characters) : undefined;
   const barWidth = Math.min(100, Math.max(30, Math.round(line.text.length / 80 * 100)));
 
-  const lineContent = () => {
+  const lineBody = () => {
     if (line.type === 'scene_heading') {
       return (
-        <p className="text-xs font-bold uppercase tracking-widest text-text-muted/50 pt-4 pb-1">
+        <p className="text-xs font-bold uppercase tracking-widest text-text-muted/50 pt-2 pb-0.5 flex-1">
           {line.text}
         </p>
       );
     }
     if (line.type === 'direction') {
       return (
-        <p className="text-text-muted italic text-xs px-4">
+        <p className="text-text-muted italic text-xs px-4 flex-1">
           ({line.text})
         </p>
       );
     }
-    // dialogue
     return (
-      <div className="space-y-0.5">
+      <div className="space-y-0.5 flex-1">
         <p className="text-[11px] font-bold tracking-wider" style={{ color }}>
           {line.character}
         </p>
@@ -133,39 +148,34 @@ function ScriptLineRow({
     );
   };
 
-  const typeLabel = line.type === 'scene_heading' ? 'Scene Heading' : line.type === 'direction' ? 'Direction' : 'Dialogue';
-
   return (
-    <div className={`group relative ${isEditing ? 'bg-bg-secondary rounded-xl px-3 py-2 -mx-3' : ''}`}>
-      <div className="flex items-start gap-2">
-        <div className="flex-1 min-w-0 py-0.5">
-          {lineContent()}
-        </div>
-        {onCorrect && (
-          <button
-            onClick={onToggleEdit}
-            className={`shrink-0 mt-1 p-1 rounded-lg transition-colors
-              ${isEditing
-                ? 'bg-accent/20 text-accent'
-                : 'opacity-0 group-hover:opacity-100 text-text-muted hover:text-text-primary hover:bg-bg-tertiary'
-              }`}
-            aria-label="Edit line type"
+    <div className={`rounded-xl transition-colors ${isEditing ? 'bg-bg-secondary' : canEdit ? 'hover:bg-bg-secondary/50 active:bg-bg-secondary' : ''}`}>
+      {/* Row — tappable */}
+      <button
+        onClick={onTap}
+        disabled={!canEdit}
+        className="w-full text-left px-3 py-2 flex items-start gap-2"
+      >
+        {canEdit && <TypeBadge type={line.type} />}
+        {lineBody()}
+        {canEdit && (
+          <svg
+            width="14" height="14"
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+            className={`shrink-0 mt-0.5 transition-transform ${isEditing ? 'rotate-180 text-accent' : 'text-text-muted/40'}`}
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-            </svg>
-          </button>
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
         )}
-      </div>
+      </button>
 
-      {/* Inline edit panel */}
+      {/* Edit panel */}
       {isEditing && onCorrect && (
-        <div className="mt-2 space-y-2 pb-1">
+        <div className="px-3 pb-3 space-y-3">
           {/* Type picker */}
-          <div className="space-y-1">
-            <p className="text-[10px] uppercase tracking-wider text-text-muted">Line type</p>
-            <div className="flex gap-1.5">
+          <div className="space-y-1.5">
+            <p className="text-[10px] uppercase tracking-wider text-text-muted">Change type to</p>
+            <div className="grid grid-cols-3 gap-2">
               {(['dialogue', 'direction', 'scene_heading'] as const).map(t => (
                 <button
                   key={t}
@@ -173,10 +183,10 @@ function ScriptLineRow({
                     type: t,
                     character: t === 'dialogue' ? (line.character ?? characters[0]) : undefined,
                   })}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors
+                  className={`py-2.5 rounded-xl text-xs font-semibold transition-colors
                     ${line.type === t
                       ? 'bg-accent text-white'
-                      : 'bg-bg-tertiary text-text-muted hover:text-text-primary'
+                      : 'bg-bg-tertiary text-text-muted hover:text-text-primary active:bg-bg-tertiary/80'
                     }`}
                 >
                   {t === 'scene_heading' ? 'Heading' : t === 'direction' ? 'Direction' : 'Dialogue'}
@@ -187,17 +197,17 @@ function ScriptLineRow({
 
           {/* Character picker — only for dialogue */}
           {line.type === 'dialogue' && (
-            <div className="space-y-1">
-              <p className="text-[10px] uppercase tracking-wider text-text-muted">Character</p>
-              <div className="flex flex-wrap gap-1.5">
+            <div className="space-y-1.5">
+              <p className="text-[10px] uppercase tracking-wider text-text-muted">Assign to character</p>
+              <div className="flex flex-wrap gap-2">
                 {characters.map(char => (
                   <button
                     key={char}
                     onClick={() => onCorrect({ type: 'dialogue', character: char })}
-                    className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors
+                    className={`px-4 py-2 rounded-xl text-xs font-semibold transition-colors
                       ${line.character === char
                         ? 'bg-accent text-white'
-                        : 'bg-bg-tertiary text-text-muted hover:text-text-primary'
+                        : 'bg-bg-tertiary text-text-muted hover:text-text-primary active:bg-bg-tertiary/80'
                       }`}
                   >
                     {char}
@@ -206,8 +216,6 @@ function ScriptLineRow({
               </div>
             </div>
           )}
-
-          <p className="text-[10px] text-text-muted/60 italic">Current: {typeLabel}{line.character ? ` · ${line.character}` : ''}</p>
         </div>
       )}
     </div>
