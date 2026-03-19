@@ -83,13 +83,12 @@ function detectIndentedMode(rawLines: string[]): boolean {
 //   Dialogue:     ~10 spaces  (~180pt)
 //   Parenthetical:~16 spaces  (~223pt)
 //   Character:    ~22 spaces  (~266pt)
-type IndentClass = 'action' | 'dialogue' | 'character' | 'unknown';
+type IndentClass = 'action' | 'dialogue' | 'character';
 
 function classifyByIndent(indent: number): IndentClass {
   if (indent >= 18) return 'character';  // most indented = character name or parenthetical
-  if (indent >= 8) return 'dialogue';    // moderate = dialogue
-  if (indent < 5) return 'action';       // leftmost = stage direction / action
-  return 'unknown';
+  if (indent >= 2) return 'dialogue';    // moderate = dialogue (lowered from 8 to handle wide centered dialogue)
+  return 'action';                       // truly at the left margin (0-1 spaces)
 }
 
 export function parseScript(rawText: string): ParsedScript {
@@ -134,11 +133,14 @@ export function parseScript(rawText: string): ParsedScript {
     const nameWithoutTrailing = line.replace(/[:–—-]\s*$/, '').trim();
     const potentialName = cleanCharacterName(nameWithoutTrailing);
 
-    // In indented mode, high-indent lines are character names even without strict caps check
+    // In indented mode, high-indent lines are character names — but MUST also be ALL CAPS.
+    // Without the caps check, short centered dialogue (e.g. "Really?") at the same indent
+    // as character names would be misidentified as characters.
     // In plain text mode, require the usual ALL-CAPS pattern
     const isCharacterCandidate = isIndented
       ? (classifyByIndent(indent) === 'character' &&
          potentialName.length >= 2 &&
+         isAllCapsOrCharacterName(nameWithoutTrailing) &&
          !isNonCharacterCaps(potentialName) &&
          !looksLikeAction(line))
       : (CHARACTER_NAME_PATTERN.test(nameWithoutTrailing) &&
@@ -170,11 +172,19 @@ export function parseScript(rawText: string): ParsedScript {
         const nextLine = nextRaw.trim();
 
         if (!nextLine) {
-          // In indented mode, skip a single blank line that falls between a
-          // character header and their first dialogue line (PDF formatting artifact).
-          // Only skip if we haven't collected any dialogue yet; once dialogue has
-          // started, a blank line always ends the block.
+          // In indented mode, skip blank lines between a character header and
+          // their first dialogue line (PDF formatting artifact).
           if (isIndented && dialogueLines.length === 0) { j++; continue; }
+          // In indented mode, peek ahead for (cont'd) continuation past blank lines.
+          // Screenplays use (cont'd) / (CONT'D) after a beat/pause to indicate
+          // the same character keeps speaking.
+          if (isIndented && dialogueLines.length > 0) {
+            let k = j + 1;
+            while (k < rawLines.length && !rawLines[k].trim()) k++;
+            if (k < rawLines.length && /^\s*\(?cont'?d\)?/i.test(rawLines[k].trim())) {
+              j++; continue;
+            }
+          }
           break;
         }
 
@@ -186,6 +196,7 @@ export function parseScript(rawText: string): ParsedScript {
         const nextIsCharacter = isIndented
           ? (classifyByIndent(nextIndent) === 'character' &&
              cleanCharacterName(nextNameClean).length >= 2 &&
+             isAllCapsOrCharacterName(nextNameClean) &&
              !isNonCharacterCaps(cleanCharacterName(nextNameClean)) &&
              !looksLikeAction(nextLine))
           : (CHARACTER_NAME_PATTERN.test(nextNameClean) && isAllCapsOrCharacterName(nextNameClean));
@@ -195,6 +206,8 @@ export function parseScript(rawText: string): ParsedScript {
         // Full-line parenthetical (direction) inside dialogue block
         const inlineDirMatch = nextLine.match(DIRECTION_PATTERN);
         if (inlineDirMatch) {
+          // (cont'd) / (CONT'D) is a continuation marker, not a direction — skip it
+          if (/^cont'?d$/i.test(inlineDirMatch[1].trim())) { j++; continue; }
           if (dialogueLines.length > 0) {
             characterSet.add(potentialName);
             scriptLines.push({
