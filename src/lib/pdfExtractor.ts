@@ -35,9 +35,10 @@ export async function extractTextFromPDF(file: File): Promise<string> {
       entry.items.push({ x, str: item.str, width: w });
     }
 
-    // Collect leftmost x per line. Filtering x < 72pt removes page numbers / gutter marks.
+    // Collect leftmost x per line. Filtering x < 72pt removes gutter marks / binding artifacts.
+    // Use >= 72 so action text at the standard 1-inch margin (72pt) is included.
     for (const entry of lineMap.values()) {
-      if (entry.minX > 72) lineStartXValues.push(entry.minX);
+      if (entry.minX >= 72) lineStartXValues.push(entry.minX);
     }
 
     allPages.push(lineMap);
