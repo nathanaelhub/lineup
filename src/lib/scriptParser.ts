@@ -46,6 +46,32 @@ function isAllCapsOrCharacterName(line: string): boolean {
   return letterCount > 0 && upperCount / letterCount >= 0.8;
 }
 
+/**
+ * Page-break boilerplate that should be silently dropped from any script.
+ * These artifacts (page numbers, MORE/CONTINUED markers, page headers) sit
+ * between scenes/dialogue in PDF exports and otherwise leak into output as
+ * spurious directions or get appended to a character's dialogue.
+ *
+ *   2.          ← page number (centered, top of page)
+ *   12          ← page number (no period)
+ *   (MORE)      ← bottom-of-page continuation marker
+ *   (CONTINUED) ← scene-continued marker
+ *   CONTINUED:  ← same, without parens
+ *   CONT'D      ← character-continued marker (when it survives as its own line)
+ *   Page 3 of 8 ← header
+ */
+function isPageBoilerplate(line: string): boolean {
+  const t = line.trim();
+  if (!t) return false;
+  // Bare page numbers: "2", "2.", "12.", up to 4 digits
+  if (/^\d{1,4}\.?$/.test(t)) return true;
+  // Page header text
+  if (/^page\s+\d+(\s+of\s+\d+)?$/i.test(t)) return true;
+  // MORE / CONTINUED / CONT'D markers, with or without parentheses
+  if (/^\(?\s*(MORE|CONTINUED|CONT['']?D)\s*\)?:?$/i.test(t)) return true;
+  return false;
+}
+
 // Check if text looks like prose action rather than dialogue
 function looksLikeAction(text: string): boolean {
   if (!text) return false;
@@ -106,6 +132,9 @@ export function parseScript(rawText: string): ParsedScript {
     const line = rawLine.trim();
 
     if (!line) { i++; continue; }
+
+    // Drop page-break boilerplate (page numbers, (MORE), (CONTINUED), CONT'D, etc.)
+    if (isPageBoilerplate(line)) { i++; continue; }
 
     // Scene headings
     if (SCENE_HEADING_PATTERN.test(line)) {
@@ -171,18 +200,34 @@ export function parseScript(rawText: string): ParsedScript {
         const nextIndent = getIndent(nextRaw);
         const nextLine = nextRaw.trim();
 
+        // Skip page-break boilerplate inside dialogue blocks (page numbers, MORE, CONT'D)
+        if (isPageBoilerplate(nextLine)) { j++; continue; }
+
         if (!nextLine) {
           // In indented mode, skip blank lines between a character header and
           // their first dialogue line (PDF formatting artifact).
           if (isIndented && dialogueLines.length === 0) { j++; continue; }
-          // In indented mode, peek ahead for (cont'd) continuation past blank lines.
-          // Screenplays use (cont'd) / (CONT'D) after a beat/pause to indicate
-          // the same character keeps speaking.
+          // In indented mode, peek ahead for (cont'd) continuation past blank lines
+          // and page-break boilerplate. Screenplays use (cont'd) / (CONT'D) after
+          // a beat/pause OR after a page break to indicate the same character
+          // keeps speaking — and a page break inserts (MORE) + page number first.
           if (isIndented && dialogueLines.length > 0) {
             let k = j + 1;
-            while (k < rawLines.length && !rawLines[k].trim()) k++;
-            if (k < rawLines.length && /^\s*\(?cont'?d\)?/i.test(rawLines[k].trim())) {
-              j++; continue;
+            while (k < rawLines.length) {
+              const peek = rawLines[k].trim();
+              if (!peek || isPageBoilerplate(peek)) { k++; continue; }
+              break;
+            }
+            if (k < rawLines.length) {
+              const peek = rawLines[k].trim();
+              // Same character on its own (with optional CONT'D) restarts dialogue
+              const peekName = cleanCharacterName(peek.replace(/[:–—-]\s*$/, '').trim());
+              const peekIsSameCharCont = peekName === potentialName;
+              const peekIsCont = /^\s*\(?cont'?d\)?/i.test(peek);
+              if (peekIsCont || peekIsSameCharCont) {
+                j = k + 1; // jump past blanks/boilerplate AND the CONT'D / character header
+                continue;
+              }
             }
           }
           break;
