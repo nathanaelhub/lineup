@@ -90,8 +90,8 @@ export function SetupScreen({ script, onStart, onBack, isDarkMode, onToggleDark 
     >
       {/* Top bar */}
       <div
-        className="shrink-0 grid items-center"
-        style={{ padding: '32px 18px 12px', gridTemplateColumns: '48px 1fr 48px', gap: 8 }}
+        className="shrink-0 grid items-center safe-top"
+        style={{ paddingLeft: 18, paddingRight: 18, paddingBottom: 12, gridTemplateColumns: '48px 1fr 48px', gap: 8 }}
       >
         <button onClick={onBack} aria-label="Back" className="icon-btn">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -459,9 +459,11 @@ export function SetupScreen({ script, onStart, onBack, isDarkMode, onToggleDark 
 
       {/* Bottom CTA bar */}
       <div
-        className="shrink-0"
+        className="shrink-0 safe-bottom"
         style={{
-          padding: '12px 24px 28px',
+          paddingTop: 12,
+          paddingLeft: 24,
+          paddingRight: 24,
           borderTop: '1px solid var(--paper-line)',
           background: 'var(--paper)',
           display: 'flex',

@@ -24,8 +24,8 @@ export function HomeScreen({ savedScripts, onUpload, onLoadSaved, onDeleteSaved,
     <div className="h-full w-full flex flex-col paper-grain fade-in" style={{ background: 'var(--paper)', color: 'var(--ink)' }}>
       {/* Top bar */}
       <div
-        className="shrink-0 grid items-center"
-        style={{ padding: '32px 18px 12px', gridTemplateColumns: '48px 1fr 48px', gap: 8 }}
+        className="shrink-0 grid items-center safe-top"
+        style={{ paddingLeft: 18, paddingRight: 18, paddingBottom: 12, gridTemplateColumns: '48px 1fr 48px', gap: 8 }}
       >
         <button
           onClick={onToggleDark}
@@ -86,7 +86,10 @@ export function HomeScreen({ savedScripts, onUpload, onLoadSaved, onDeleteSaved,
       </div>
 
       {/* Body */}
-      <div className="scroll" style={{ flex: 1, padding: '0 20px 28px' }}>
+      <div
+        className="scroll safe-bottom"
+        style={{ flex: 1, paddingLeft: 20, paddingRight: 20, paddingBottom: 28 }}
+      >
         <ScriptUpload onUpload={onUpload} />
 
         <div

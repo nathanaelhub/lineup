@@ -89,8 +89,8 @@ export function RehearsalScreen({ config, onExit, installPrompt, onInstall }: Re
 
       {/* Top bar */}
       <div
-        className="shrink-0 grid items-center"
-        style={{ padding: '32px 18px 12px', gridTemplateColumns: '48px 1fr auto', gap: 8 }}
+        className="shrink-0 grid items-center safe-top"
+        style={{ paddingLeft: 18, paddingRight: 18, paddingBottom: 12, gridTemplateColumns: '48px 1fr auto', gap: 8 }}
       >
         <button
           onClick={() => {
@@ -201,9 +201,11 @@ export function RehearsalScreen({ config, onExit, installPrompt, onInstall }: Re
       {/* Transport & mic strip */}
       {!isComplete && (
         <div
-          className="shrink-0"
+          className="shrink-0 safe-bottom"
           style={{
-            padding: '10px 18px 22px',
+            paddingTop: 10,
+            paddingLeft: 18,
+            paddingRight: 18,
             background: 'var(--paper)',
             borderTop: '1px solid var(--paper-line)',
           }}
@@ -261,7 +263,7 @@ export function RehearsalScreen({ config, onExit, installPrompt, onInstall }: Re
             </button>
             <button
               type="button"
-              className="transport-side"
+              className="transport-side transport-side-jump"
               onClick={() => rehearsal.goToLine(Math.max(0, idx - 5))}
               disabled={rehearsal.state === 'IDLE'}
               aria-label="Back five"
@@ -273,7 +275,7 @@ export function RehearsalScreen({ config, onExit, installPrompt, onInstall }: Re
             <CenterButton state={rehearsal.state} onPlay={rehearsal.play} onPause={rehearsal.pause} onAdvance={rehearsal.advance} />
             <button
               type="button"
-              className="transport-side"
+              className="transport-side transport-side-jump"
               onClick={() => rehearsal.goToLine(Math.min(total - 1, idx + 5))}
               disabled={rehearsal.state === 'IDLE'}
               aria-label="Forward five"
@@ -295,10 +297,10 @@ export function RehearsalScreen({ config, onExit, installPrompt, onInstall }: Re
             </button>
           </div>
 
-          {/* Hint row */}
+          {/* Hint row — desktop only */}
           <div
+            className="kbd-hint"
             style={{
-              display: 'flex',
               justifyContent: 'center',
               alignItems: 'center',
               gap: 10,

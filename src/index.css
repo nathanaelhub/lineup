@@ -459,6 +459,29 @@ input, textarea { font-family: inherit; }
   padding: 0 2px;
 }
 
+/* ------------------------------------------------------------------ */
+/* Mobile / safe-area polish                                           */
+/* ------------------------------------------------------------------ */
+.safe-top { padding-top: max(20px, env(safe-area-inset-top, 20px)); }
+.safe-bottom { padding-bottom: max(20px, env(safe-area-inset-bottom, 20px)); }
+
+/* Hide keyboard hint row on touch-only devices */
+.kbd-hint { display: flex; }
+@media (hover: none) and (pointer: coarse) {
+  .kbd-hint { display: none; }
+}
+
+/* Smaller screens: tighten paddings & let the transport main shrink */
+@media (max-width: 380px) {
+  .line-card { padding: 16px 18px 14px; }
+  .line-card::before { left: 14px; }
+  .line-card::after { right: 14px; }
+  .transport { grid-template-columns: 44px 1fr 44px; gap: 6px; }
+  .transport .transport-side.transport-side-jump { display: none; }
+  .transport-main { height: 60px; font-size: 16px; }
+  .transport-side { height: 44px; width: 44px; }
+}
+
 .a-link {
   color: var(--ink-soft);
   text-decoration: underline;
