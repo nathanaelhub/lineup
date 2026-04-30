@@ -23,7 +23,7 @@ export function ScriptUpload({ onUpload }: ScriptUploadProps) {
         onUpload(text, file.name);
       }
     } catch (err) {
-      setError('Could not read file. Make sure it\'s a valid .txt or .pdf.');
+      setError("Could not read file. Make sure it's a valid .txt or .pdf.");
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -49,66 +49,83 @@ export function ScriptUpload({ onUpload }: ScriptUploadProps) {
   const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) handleFile(file);
-    // Reset so the same file can be re-selected
     e.target.value = '';
   }, [handleFile]);
 
   return (
-    <div className="space-y-2">
-      <div
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <button
+        type="button"
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onClick={() => !isLoading && fileInputRef.current?.click()}
-        className={`
-          relative cursor-pointer rounded-2xl border-2 border-dashed p-12
-          transition-all duration-300 ease-out
-          ${isDragging
-            ? 'border-accent bg-accent/10 scale-[1.02]'
-            : isLoading
-              ? 'border-bg-tertiary opacity-60 cursor-wait'
-              : 'border-bg-tertiary hover:border-accent/50 hover:bg-bg-secondary'
-          }
-        `}
+        disabled={isLoading}
+        className={`drop${isDragging ? ' dragging' : ''}`}
+        style={{ width: '100%', display: 'block', cursor: isLoading ? 'wait' : 'pointer' }}
       >
         <input
           ref={fileInputRef}
           type="file"
           accept=".txt,.text,.pdf,text/plain,application/pdf"
           onChange={handleFileInput}
-          className="hidden"
+          style={{ display: 'none' }}
         />
-        <div className="flex flex-col items-center gap-4 text-center">
-          <div className={`
-            w-16 h-16 rounded-full flex items-center justify-center
-            transition-colors duration-300
-            ${isDragging ? 'bg-accent/20 text-accent' : 'bg-bg-tertiary text-text-secondary'}
-          `}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 8 }}>
+          <div
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 12,
+              background: 'var(--ink)',
+              color: 'var(--paper)',
+              display: 'grid',
+              placeItems: 'center',
+            }}
+          >
             {isLoading ? (
-              <svg className="animate-spin" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                style={{ animation: 'spin 1s linear infinite' }}
+              >
                 <path d="M21 12a9 9 0 1 1-6.219-8.56" />
               </svg>
             ) : (
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="17 8 12 3 7 8" />
-                <line x1="12" y1="3" x2="12" y2="15" />
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
               </svg>
             )}
           </div>
-          <div>
-            <p className="text-lg font-medium text-text-primary">
-              {isLoading ? 'Reading script...' : isDragging ? 'Drop your script here' : 'Upload a script'}
-            </p>
-            <p className="mt-1 text-sm text-text-muted">
-              Tap to browse · supports .txt and .pdf
-            </p>
-          </div>
+          <span className="display" style={{ fontSize: 22 }}>
+            {isLoading ? 'Reading…' : isDragging ? 'Drop it' : 'New script'}
+          </span>
         </div>
-      </div>
+        <p className="label" style={{ marginTop: 4 }}>Drop · pdf · txt · paste</p>
+      </button>
       {error && (
-        <p className="text-center text-sm text-danger px-2">{error}</p>
+        <p
+          style={{
+            textAlign: 'center',
+            fontSize: 12,
+            color: 'var(--scarlet)',
+            fontFamily: 'var(--mono)',
+            letterSpacing: '0.1em',
+            padding: '0 8px',
+          }}
+        >
+          {error}
+        </p>
       )}
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
 }

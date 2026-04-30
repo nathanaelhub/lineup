@@ -38,6 +38,10 @@ function App() {
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
+  useEffect(() => {
+    document.documentElement.classList.toggle('theme-ink', isDarkMode);
+  }, [isDarkMode]);
+
   const handleUpload = useCallback((text: string, filename: string) => {
     const parsed = parseScript(text);
     if (parsed.characters.length === 0) {
@@ -79,7 +83,7 @@ function App() {
   }, []);
 
   return (
-    <div className="h-full w-full">
+    <div className="h-full w-full" style={{ background: 'var(--paper)', color: 'var(--ink)' }}>
       {screen === 'home' && (
         <HomeScreen
           savedScripts={savedScripts}

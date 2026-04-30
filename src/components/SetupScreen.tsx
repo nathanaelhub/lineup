@@ -69,228 +69,451 @@ export function SetupScreen({ script, onStart, onBack, isDarkMode, onToggleDark 
     ...(startIndex !== undefined ? { startIndex } : {}),
   });
 
-  // Theme helpers
-  const bg = isDarkMode ? 'bg-bg-primary' : 'bg-white';
-  const surface = isDarkMode ? 'bg-bg-secondary' : 'bg-gray-50';
-  const textPrimary = isDarkMode ? 'text-text-primary' : 'text-gray-900';
-  const textMuted = isDarkMode ? 'text-text-muted' : 'text-gray-500';
-  const hoverBg = isDarkMode ? 'hover:bg-bg-tertiary' : 'hover:bg-gray-100';
+  const dialogueCount = useMemo(
+    () => script.lines.filter((l) => l.type === 'dialogue').length,
+    [script.lines]
+  );
+
+  // Mode tri-state
+  type Mode = 'open' | 'off-book' | 'cues';
+  const currentMode: Mode = offBook ? (cueMode ? 'cues' : 'off-book') : 'open';
+  const setMode = (m: Mode) => {
+    if (m === 'open') { setOffBook(false); setCueMode(false); }
+    else if (m === 'off-book') { setOffBook(true); setCueMode(false); }
+    else { setOffBook(true); setCueMode(true); }
+  };
 
   return (
-    <div className={`h-full flex flex-col overflow-y-auto ${bg}`}>
-      <div className="flex-1 px-5 py-6 max-w-lg mx-auto w-full space-y-6">
-
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <button
-            onClick={onBack}
-            className={`p-2 -ml-2 rounded-xl transition-colors ${textMuted} ${hoverBg}`}
-            aria-label="Back"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="15 18 9 12 15 6"/>
+    <div
+      className="h-full w-full flex flex-col fade-in"
+      style={{ background: 'var(--paper)', color: 'var(--ink)' }}
+    >
+      {/* Top bar */}
+      <div
+        className="shrink-0 grid items-center"
+        style={{ padding: '32px 18px 12px', gridTemplateColumns: '48px 1fr 48px', gap: 8 }}
+      >
+        <button onClick={onBack} aria-label="Back" className="icon-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 6 9 12 15 18" />
+          </svg>
+        </button>
+        <span className="ticket-no" style={{ justifySelf: 'center' }}>Setup</span>
+        <button onClick={onToggleDark} aria-label="Toggle theme" className="icon-btn">
+          {isDarkMode ? (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="4"/>
+              <line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/>
+              <line x1="4.2" y1="4.2" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.8" y2="19.8"/>
+              <line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/>
+              <line x1="4.2" y1="19.8" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.8" y2="4.2"/>
             </svg>
-          </button>
-          <h2 className={`text-sm font-semibold truncate px-2 max-w-[60%] ${textPrimary}`}>{script.title}</h2>
-          <button
-            onClick={onToggleDark}
-            aria-label="Toggle dark mode"
-            className={`p-2 rounded-xl transition-colors ${textMuted} ${hoverBg}`}
-          >
-            {isDarkMode ? (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="5"/>
-                <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
-                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-                <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
-                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-              </svg>
-            ) : (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-              </svg>
-            )}
-          </button>
+          ) : (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+          )}
+        </button>
+      </div>
+
+      <div className="scroll" style={{ flex: 1, padding: '8px 24px 24px' }}>
+        {/* Title block */}
+        <div style={{ marginBottom: 22 }}>
+          <span className="ticket-no" style={{ color: 'var(--scarlet)' }}>Today's piece</span>
+          <h2 className="display" style={{ fontSize: 30, lineHeight: 1.04, marginTop: 6 }}>{script.title}</h2>
+          <p className="font-serif" style={{ fontStyle: 'italic', color: 'var(--ink-mute)', marginTop: 4, fontSize: 14 }}>
+            {script.characters.length} in cast · {dialogueCount} lines
+          </p>
         </div>
 
-        {/* Character picker */}
-        <div className="space-y-3">
-          <p className={`text-xs font-medium uppercase tracking-wider ${textMuted}`}>Who are you playing?</p>
-          <div className="grid grid-cols-2 gap-2">
-            {script.characters.map(char => {
+        <div className="curtain" style={{ margin: '0 -8px 18px' }} />
+
+        {/* Cast list */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
+            <h3 className="display" style={{ fontSize: 20 }}>Cast list</h3>
+            <span className="label">Choose your role</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            {script.characters.map((char, i) => {
+              const sel = myCharacter === char;
               const color = getCharacterColor(char, script.characters);
-              const isSelected = myCharacter === char;
-              const lineCount = script.lines.filter(l => l.type === 'dialogue' && l.character === char).length;
+              const lineCount = script.lines.filter(
+                (l) => l.type === 'dialogue' && l.character === char
+              ).length;
               return (
                 <button
                   key={char}
+                  type="button"
                   onClick={() => setMyCharacter(char)}
-                  className={`flex items-center gap-3 px-4 py-4 rounded-2xl border text-left transition-all active:scale-[0.97]
-                    ${isSelected
-                      ? isDarkMode
-                        ? 'bg-accent/10 border-accent text-text-primary'
-                        : 'bg-gray-900 border-gray-900 text-white'
-                      : isDarkMode
-                        ? 'bg-bg-secondary border-bg-tertiary text-text-secondary hover:bg-bg-tertiary'
-                        : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
-                    }`}
+                  className={'cast-card' + (sel ? ' selected' : '')}
                 >
-                  {/* Color swatch */}
+                  <div className="chno">№ {String(i + 1).padStart(2, '0')}</div>
                   <div
-                    className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-white text-xs font-bold"
-                    style={{ backgroundColor: isSelected && !isDarkMode ? 'rgba(255,255,255,0.25)' : color }}
+                    style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: '50%',
+                      background: color,
+                      marginBottom: 8,
+                      display: 'grid',
+                      placeItems: 'center',
+                      color: 'var(--paper)',
+                      fontFamily: 'var(--mono)',
+                      fontSize: 10,
+                      fontWeight: 600,
+                    }}
                   >
-                    {char.charAt(0)}
+                    {char[0]}
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold truncate">{char}</p>
-                    <p className={`text-xs mt-0.5 ${isSelected ? 'opacity-70' : textMuted}`}>{lineCount} line{lineCount !== 1 ? 's' : ''}</p>
+                  <div className="display" style={{ fontSize: 17, lineHeight: 1.05 }}>
+                    {char}
                   </div>
-                  {isSelected && (
-                    <svg className="shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 17 4 12"/>
-                    </svg>
-                  )}
+                  <div className="label" style={{ marginTop: 4 }}>
+                    {lineCount} line{lineCount === 1 ? '' : 's'}
+                  </div>
                 </button>
               );
             })}
           </div>
         </div>
 
-        {/* Voice toggle + Preview script button — shown after character selected */}
+        {/* Script preview link — once a character is picked */}
         {myCharacter && (
-          <div className="space-y-2">
-            <ToggleOption
-              label="Voice"
-              description="Read other characters' lines aloud"
-              checked={ttsEnabled}
-              onChange={setTtsEnabled}
-              isDarkMode={isDarkMode}
-            />
-            <button
-              onClick={() => setScriptViewOpen(true)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors text-left
-                ${isDarkMode ? 'bg-bg-secondary border-bg-tertiary hover:bg-bg-tertiary' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={textMuted}>
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-                <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
-              </svg>
-              <div className="flex-1">
-                <p className={`text-sm font-medium ${textPrimary}`}>Preview Script</p>
-                <p className={`text-xs ${textMuted}`}>See full script with your lines blacked out</p>
-              </div>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={textMuted}>
-                <polyline points="9 18 15 12 9 6"/>
-              </svg>
-            </button>
+          <button
+            onClick={() => setScriptViewOpen(true)}
+            type="button"
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              padding: '12px 14px',
+              background: 'var(--paper-deep)',
+              border: '1px solid var(--paper-line)',
+              borderRadius: 6,
+              cursor: 'pointer',
+              color: 'inherit',
+              textAlign: 'left',
+              marginBottom: 20,
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" style={{ color: 'var(--ink-mute)' }}>
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+            </svg>
+            <div style={{ flex: 1 }}>
+              <div className="font-serif" style={{ fontSize: 14 }}>Preview script</div>
+              <div className="label" style={{ marginTop: 2 }}>See full text · your lines blacked out</div>
+            </div>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" style={{ color: 'var(--ink-mute)' }}>
+              <polyline points="9 6 15 12 9 18"/>
+            </svg>
+          </button>
+        )}
+
+        {/* Mode chips */}
+        <div style={{ marginBottom: 20 }}>
+          <h3 className="display" style={{ fontSize: 20, marginBottom: 10 }}>Mode</h3>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr 1fr',
+              border: '1px solid var(--paper-line)',
+              borderRadius: 6,
+              overflow: 'hidden',
+            }}
+          >
+            {([
+              ['Open', 'open'],
+              ['Off-book', 'off-book'],
+              ['Just cues', 'cues'],
+            ] as Array<[string, Mode]>).map(([label, m], i) => {
+              const active = currentMode === m;
+              return (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setMode(m)}
+                  style={{
+                    padding: '12px 8px',
+                    background: active ? 'var(--ink)' : 'var(--paper)',
+                    color: active ? 'var(--paper)' : 'var(--ink-soft)',
+                    fontFamily: 'var(--serif)',
+                    fontSize: 15,
+                    fontStyle: active ? 'italic' : 'normal',
+                    borderLeft: i === 0 ? 'none' : '1px solid var(--paper-line)',
+                    borderTop: 'none',
+                    borderRight: 'none',
+                    borderBottom: 'none',
+                    cursor: 'pointer',
+                    transition: 'all 200ms',
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
-        )}
-
-        {/* Resume button */}
-        {resumeAvailable && (
-          <button
-            onClick={() => onStart(startConfig(savedPosition!.lineIndex))}
-            className="w-full py-3 rounded-2xl border border-accent/40 text-accent text-sm font-medium hover:bg-accent/10 transition-all active:scale-[0.98] text-center"
+          <p
+            className="font-serif"
+            style={{
+              fontStyle: 'italic',
+              fontSize: 12,
+              color: 'var(--ink-mute)',
+              marginTop: 8,
+              lineHeight: 1.4,
+            }}
           >
-            Resume from line {savedPosition!.lineIndex + 1} →
-          </button>
-        )}
+            {currentMode === 'cues' && 'Memory check. Your lines hidden, others trimmed to last 3 words.'}
+            {currentMode === 'off-book' && 'Your lines hidden. Other dialogue read in full.'}
+            {currentMode === 'open' && 'Full script visible. Best for first reads & blocking.'}
+          </p>
+        </div>
 
-        {/* Start button */}
-        <button
-          onClick={() => { if (myCharacter) onStart(startConfig()); }}
-          disabled={!myCharacter}
-          className={`w-full py-4 rounded-2xl text-lg font-semibold transition-all active:scale-[0.98]
-            disabled:opacity-40 disabled:cursor-not-allowed
-            ${isDarkMode
-              ? 'bg-accent text-white hover:bg-accent-glow shadow-lg shadow-accent/20'
-              : 'bg-gray-900 text-white hover:bg-gray-700 shadow-lg shadow-gray-900/20'
-            }`}
-        >
-          {myCharacter ? `Start as ${myCharacter}` : 'Select a character above'}
-        </button>
-
-        {/* Advanced settings accordion */}
-        <div>
-          <button
-            onClick={() => setAdvancedOpen(v => !v)}
-            aria-expanded={advancedOpen}
-            className={`w-full flex items-center justify-center gap-1.5 py-2 text-xs transition-colors ${textMuted} ${hoverBg} rounded-xl`}
+        {/* Voice + auto-advance + tempo */}
+        <div style={{ marginBottom: 20 }}>
+          <h3 className="display" style={{ fontSize: 20, marginBottom: 10 }}>Options</h3>
+          <div
+            style={{
+              background: 'var(--paper-deep)',
+              borderRadius: 6,
+              border: '1px solid var(--paper-line)',
+            }}
           >
-            Advanced settings {advancedOpen ? '▲' : '▾'}
-          </button>
-          {advancedOpen && (
-            <div className="space-y-4 pt-4">
-
-              {/* Toggles */}
-              <div className="space-y-2">
-                <ToggleOption label="Auto-advance" description="Mic detects when you finish speaking" checked={autoAdvance} onChange={setAutoAdvance} isDarkMode={isDarkMode} />
-                <ToggleOption label="Off-book mode" description="Hides your lines for memory practice" checked={offBook} onChange={setOffBook} isDarkMode={isDarkMode} />
-                <ToggleOption label="Cue mode" description="Shows only last 3 words of other character's line" checked={cueMode} onChange={setCueMode} isDarkMode={isDarkMode} />
-                <ToggleOption label="Just my cues" description="Cue mode + off-book together" checked={justMyCues} onChange={handleJustMyCues} isDarkMode={isDarkMode} />
-                <ToggleOption label="Show stage directions" description="Pause briefly at stage directions" checked={showDirections} onChange={setShowDirections} isDarkMode={isDarkMode} />
+            <ToggleRow
+              label="Auto-advance"
+              caption="Mic detects when you're done"
+              on={autoAdvance}
+              onChange={setAutoAdvance}
+            />
+            <div className="div-rule" />
+            <ToggleRow
+              label="Read other parts"
+              caption="Scene partners speak aloud"
+              on={ttsEnabled}
+              onChange={setTtsEnabled}
+            />
+            <div className="div-rule" />
+            <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div>
+                <div className="font-serif" style={{ fontSize: 15 }}>Tempo</div>
+                <div className="label" style={{ marginTop: 2 }}>Reading speed</div>
               </div>
-
-              {/* Speed */}
-              <div className={`flex items-center justify-between ${surface} rounded-xl px-4 py-3`}>
-                <span className={`text-sm ${textPrimary}`}>Speed</span>
-                <div className="flex items-center gap-1">
-                  {[0.75, 1.0, 1.25, 1.5].map((s) => (
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 4,
+                  background: 'var(--paper)',
+                  borderRadius: 999,
+                  padding: 3,
+                  border: '1px solid var(--paper-line)',
+                }}
+              >
+                {[0.75, 1.0, 1.25, 1.5].map((s) => {
+                  const active = Math.abs(speed - s) < 0.01;
+                  return (
                     <button
                       key={s}
+                      type="button"
                       onClick={() => setSpeed(s)}
-                      className={`px-3 py-1 rounded-lg text-xs font-medium transition-all
-                        ${Math.abs(speed - s) < 0.01 ? 'bg-accent/20 text-accent' : `${textMuted} ${hoverBg}`}`}
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: 999,
+                        fontFamily: 'var(--mono)',
+                        fontSize: 10,
+                        background: active ? 'var(--ink)' : 'transparent',
+                        color: active ? 'var(--paper)' : 'var(--ink-mute)',
+                        border: 'none',
+                        cursor: 'pointer',
+                        transition: 'all 150ms',
+                      }}
                     >
-                      {s}x
+                      {s}×
                     </button>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
+            </div>
+          </div>
+        </div>
 
-              {/* Voice Pitch — only when TTS is enabled */}
-              {ttsEnabled && !elevenLabs?.apiKey && myCharacter && script.characters.filter(c => c !== myCharacter).length > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between px-1">
-                    <span className={`text-sm ${textPrimary}`}>Voice Pitch</span>
-                    <span className={`text-xs ${textMuted}`}>per character</span>
-                  </div>
-                  {script.characters.filter(c => c !== myCharacter).map(char => (
-                    <div key={char} className={`flex items-center gap-3 ${surface} rounded-xl px-4 py-2.5`}>
-                      <span className={`text-xs font-medium ${isDarkMode ? 'text-text-secondary' : 'text-gray-600'} min-w-0 flex-1 truncate`}>{char}</span>
+        {/* Advanced settings */}
+        <button
+          type="button"
+          onClick={() => setAdvancedOpen((v) => !v)}
+          aria-expanded={advancedOpen}
+          className="a-link"
+          style={{
+            width: '100%',
+            padding: '8px 0',
+            fontFamily: 'var(--mono)',
+            fontSize: 10,
+            letterSpacing: '0.18em',
+            textTransform: 'uppercase',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            color: 'var(--ink-mute)',
+          }}
+        >
+          {advancedOpen ? '▾ Advanced settings' : '▸ Advanced settings'}
+        </button>
+
+        {advancedOpen && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingTop: 12 }}>
+            <div
+              style={{
+                background: 'var(--paper-deep)',
+                borderRadius: 6,
+                border: '1px solid var(--paper-line)',
+              }}
+            >
+              <ToggleRow
+                label="Just my cues"
+                caption="Cue mode + off-book together"
+                on={justMyCues}
+                onChange={handleJustMyCues}
+              />
+              <div className="div-rule" />
+              <ToggleRow
+                label="Show stage directions"
+                caption="Pause briefly at directions"
+                on={showDirections}
+                onChange={setShowDirections}
+              />
+            </div>
+
+            {/* Per-character pitch */}
+            {ttsEnabled && !elevenLabs?.apiKey && myCharacter && script.characters.filter((c) => c !== myCharacter).length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '0 4px' }}>
+                  <span className="font-serif" style={{ fontSize: 14 }}>Voice pitch</span>
+                  <span className="label">per character</span>
+                </div>
+                {script.characters
+                  .filter((c) => c !== myCharacter)
+                  .map((char) => (
+                    <div
+                      key={char}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 12,
+                        background: 'var(--paper-deep)',
+                        border: '1px solid var(--paper-line)',
+                        borderRadius: 6,
+                        padding: '10px 14px',
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontFamily: 'var(--mono)',
+                          fontSize: 11,
+                          letterSpacing: '0.12em',
+                          color: 'var(--ink-soft)',
+                          minWidth: 0,
+                          flex: 1,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {char}
+                      </span>
                       <input
-                        type="range" min={0.5} max={2.0} step={0.1}
+                        type="range"
+                        min={0.5}
+                        max={2.0}
+                        step={0.1}
                         value={characterPitchMap[char] ?? 1.0}
-                        onChange={(e) => setCharacterPitchMap(prev => ({ ...prev, [char]: parseFloat(e.target.value) }))}
-                        className="w-28 accent-accent"
+                        onChange={(e) =>
+                          setCharacterPitchMap((prev) => ({ ...prev, [char]: parseFloat(e.target.value) }))
+                        }
+                        style={{ width: 112, accentColor: 'var(--scarlet)' }}
                       />
-                      <span className={`text-xs ${textMuted} w-7 text-right tabular-nums`}>
+                      <span
+                        className="font-mono-tab"
+                        style={{ fontSize: 11, color: 'var(--ink-mute)', width: 28, textAlign: 'right' }}
+                      >
                         {(characterPitchMap[char] ?? 1.0).toFixed(1)}
                       </span>
                     </div>
                   ))}
-                </div>
-              )}
-
-              {/* ElevenLabs */}
-              <div className="space-y-2">
-                <h3 className={`text-sm font-medium uppercase tracking-wider ${textMuted}`}>AI Voices</h3>
-                <ElevenLabsSettings
-                  characters={script.characters.filter(c => c !== myCharacter)}
-                  config={elevenLabs}
-                  onChange={setElevenLabs}
-                />
               </div>
+            )}
 
+            {/* ElevenLabs */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span className="label" style={{ paddingLeft: 4 }}>AI voices</span>
+              <ElevenLabsSettings
+                characters={script.characters.filter((c) => c !== myCharacter)}
+                config={elevenLabs}
+                onChange={setElevenLabs}
+              />
             </div>
-          )}
-        </div>
-
+          </div>
+        )}
       </div>
 
-      {/* Full-page script preview overlay */}
+      {/* Bottom CTA bar */}
+      <div
+        className="shrink-0"
+        style={{
+          padding: '12px 24px 28px',
+          borderTop: '1px solid var(--paper-line)',
+          background: 'var(--paper)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+        }}
+      >
+        {resumeAvailable && (
+          <button
+            type="button"
+            onClick={() => onStart(startConfig(savedPosition!.lineIndex))}
+            className="a-link"
+            style={{
+              width: '100%',
+              padding: '10px',
+              textAlign: 'center',
+              background: 'transparent',
+              border: '1px dashed var(--scarlet)',
+              borderRadius: 999,
+              color: 'var(--scarlet)',
+              fontFamily: 'var(--serif)',
+              fontStyle: 'italic',
+              fontSize: 14,
+              cursor: 'pointer',
+            }}
+          >
+            Resume from line {savedPosition!.lineIndex + 1} →
+          </button>
+        )}
+        <button
+          type="button"
+          className="btn-primary"
+          disabled={!myCharacter}
+          onClick={() => myCharacter && onStart(startConfig())}
+          style={{ width: '100%' }}
+        >
+          {myCharacter ? (
+            <>
+              Take the stage as
+              <em className="display-i" style={{ marginLeft: 6 }}>{myCharacter}</em>
+            </>
+          ) : (
+            'Choose your role'
+          )}
+          {myCharacter && (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 6 15 12 9 18"/>
+            </svg>
+          )}
+        </button>
+      </div>
+
       {scriptViewOpen && myCharacter && (
         <ScriptView
           lines={correctedLines}
@@ -304,89 +527,42 @@ export function SetupScreen({ script, onStart, onBack, isDarkMode, onToggleDark 
   );
 }
 
-function ToggleOption({ label, description, checked, onChange, isDarkMode }: {
+function ToggleRow({
+  label,
+  caption,
+  on,
+  onChange,
+}: {
   label: string;
-  description: string;
-  checked: boolean;
+  caption: string;
+  on: boolean;
   onChange: (val: boolean) => void;
-  isDarkMode: boolean;
 }) {
-  const textPrimary = isDarkMode ? 'text-text-primary' : 'text-gray-900';
-  const textMuted = isDarkMode ? 'text-text-muted' : 'text-gray-500';
-  const surface = isDarkMode ? 'bg-bg-secondary' : 'bg-gray-50';
-  const hoverBg = isDarkMode ? 'hover:bg-bg-tertiary' : 'hover:bg-gray-100';
-
   return (
     <button
-      onClick={() => onChange(!checked)}
-      className={`w-full flex items-center justify-between px-4 py-3 rounded-xl ${surface} ${hoverBg} transition-colors`}
+      type="button"
+      onClick={() => onChange(!on)}
+      style={{
+        width: '100%',
+        padding: '12px 16px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+        background: 'transparent',
+        border: 'none',
+        textAlign: 'left',
+        cursor: 'pointer',
+        color: 'inherit',
+      }}
     >
-      <div className="text-left">
-        <p className={`text-sm font-medium ${textPrimary}`}>{label}</p>
-        <p className={`text-xs ${textMuted} mt-0.5`}>{description}</p>
+      <div>
+        <div className="font-serif" style={{ fontSize: 15 }}>{label}</div>
+        <div className="label" style={{ marginTop: 2 }}>{caption}</div>
       </div>
-      <div className={`w-10 h-6 rounded-full relative transition-colors duration-200 ${checked ? 'bg-accent' : isDarkMode ? 'bg-bg-tertiary' : 'bg-gray-200'}`}>
-        <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${checked ? 'translate-x-5' : 'translate-x-1'}`} />
-      </div>
+      <div className={'switch' + (on ? ' on' : '')} />
     </button>
   );
 }
 
-// ScreenplayLine kept for potential future use but removed from main flow
-export function ScreenplayLine({
-  line, myCharacter, characters, previewMode, isDarkMode,
-}: {
-  line: import('../types').ScriptLine;
-  myCharacter: string;
-  characters: string[];
-  previewMode: 'blackout' | 'highlight';
-  isDarkMode: boolean;
-}) {
-  const textPrimary = isDarkMode ? 'text-text-primary' : 'text-gray-900';
-  const textMuted = isDarkMode ? 'text-text-muted' : 'text-gray-400';
-
-  if (line.type === 'scene_heading') {
-    return (
-      <p className={`text-[10px] font-bold uppercase tracking-widest ${textMuted} pt-3 pb-1`}>
-        {line.text}
-      </p>
-    );
-  }
-
-  if (line.type === 'direction') {
-    return (
-      <p className={`italic text-xs ${textMuted} pl-8`}>
-        ({line.text})
-      </p>
-    );
-  }
-
-  const isMe = line.character === myCharacter;
-  const color = line.character ? getCharacterColor(line.character, characters) : undefined;
-  const barWidth = Math.min(100, Math.max(30, Math.round(line.text.length / 80 * 100)));
-
-  return (
-    <div className="space-y-0.5">
-      <p className="text-[11px] font-bold tracking-wider uppercase pl-16" style={{ color }}>
-        {line.character}
-      </p>
-      <div className="pl-8 font-mono">
-        {isMe ? (
-          previewMode === 'blackout' ? (
-            <div
-              className={`h-[1.1em] rounded-sm ${isDarkMode ? 'bg-text-primary/80' : 'bg-gray-900'} mt-1`}
-              style={{ width: `${barWidth}%` }}
-              aria-label="[your line]"
-            />
-          ) : (
-            <p className={`text-sm leading-relaxed ${isDarkMode ? 'bg-yellow-400/20 text-text-primary' : 'bg-yellow-200 text-gray-900'} rounded px-1 inline-block`}>
-              {line.text}
-            </p>
-          )
-        ) : (
-          <p className={`text-sm leading-relaxed ${textPrimary}`}>{line.text}</p>
-        )}
-      </div>
-    </div>
-  );
-}
+// (Helper preserved for ScriptView consumers — not exported anymore.)

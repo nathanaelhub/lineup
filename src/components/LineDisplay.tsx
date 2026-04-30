@@ -6,7 +6,7 @@ import { vibrate } from '../utils/haptics';
 function getCueText(text: string, wordCount = 3): string {
   const words = text.trim().split(/\s+/);
   if (words.length <= wordCount) return text;
-  return '…' + words.slice(-wordCount).join(' ');
+  return '… ' + words.slice(-wordCount).join(' ');
 }
 
 interface LineDisplayProps {
@@ -27,68 +27,212 @@ export function LineDisplay({ line, characters, myCharacter, offBook, cueMode, i
 
   if (!line) {
     return (
-      <div className="flex flex-col items-center justify-center gap-3 text-center px-8">
-        <p className="text-text-muted text-lg">Ready to rehearse</p>
-        <p className="text-text-muted/50 text-sm">Press play or tap ▶</p>
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          textAlign: 'center',
+          gap: 8,
+        }}
+      >
+        <span className="label">Standby</span>
+        <p
+          className="display display-i"
+          style={{ fontSize: 28, color: 'var(--ink-soft)' }}
+        >
+          ready to begin
+        </p>
+        <p
+          className="font-serif"
+          style={{ fontSize: 13, color: 'var(--ink-mute)', fontStyle: 'italic' }}
+        >
+          Tap <em>Begin</em> when you're ready.
+        </p>
       </div>
     );
   }
 
-  const isDir = line.type === 'direction';
-  const color = line.character ? getCharacterColor(line.character, characters) : undefined;
+  const color = line.character ? getCharacterColor(line.character, characters) : 'var(--ink-soft)';
 
-  if (isDir) {
+  if (line.type === 'scene_heading') {
     return (
-      <div className="flex flex-col items-center justify-center gap-2 px-6 py-8">
-        <span className="text-xs uppercase tracking-widest text-direction font-medium">
-          Stage Direction
-        </span>
-        <p className="text-center text-lg italic text-direction leading-relaxed">
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          textAlign: 'center',
+          padding: '0 16px',
+        }}
+      >
+        <span className="label" style={{ color: 'var(--scarlet)' }}>Scene</span>
+        <h2 className="display display-i" style={{ fontSize: 28, marginTop: 8, lineHeight: 1.1 }}>
+          {line.text}
+        </h2>
+      </div>
+    );
+  }
+
+  if (line.type === 'direction') {
+    return (
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          textAlign: 'center',
+          padding: '0 20px',
+        }}
+      >
+        <span className="label">Stage direction</span>
+        <p
+          className="display display-i"
+          style={{
+            fontSize: 22,
+            color: 'var(--ink-soft)',
+            marginTop: 10,
+            lineHeight: 1.25,
+          }}
+        >
           ({line.text})
         </p>
       </div>
     );
   }
 
-  // Cue mode for other character's lines: show only last 3 words
-  const displayText = (!isMyLine && cueMode)
-    ? getCueText(line.text)
-    : line.text;
+  // dialogue
+  const cueText = !isMyLine && cueMode ? getCueText(line.text) : null;
+  const showOffBookBox = isMyLine && offBook;
 
   return (
-    <div className={`
-      flex flex-col items-center justify-center gap-4 px-6 py-8
-      transition-all duration-300
-      ${isActive ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}
-    `}>
-      {/* Character name */}
-      <span className="text-sm font-bold uppercase tracking-widest" style={{ color }}>
-        {line.character}
-        {isMyLine && <span className="ml-2 text-xs font-normal opacity-70">(you)</span>}
-        {!isMyLine && cueMode && (
-          <span className="ml-2 text-xs font-normal opacity-50">cue</span>
-        )}
-      </span>
+    <div
+      style={{
+        flex: 1,
+        display: 'flex',
+        gap: 14,
+        padding: '12px 0',
+        alignItems: 'stretch',
+        opacity: isActive ? 1 : 0.7,
+        transition: 'opacity 200ms',
+      }}
+    >
+      {/* Speaker rail */}
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 8,
+          paddingTop: 4,
+        }}
+      >
+        <div className="you-bar" style={{ background: color, minHeight: 80 }} />
+      </div>
 
-      {/* Dialogue text */}
-      {isMyLine && offBook ? (
-        <div className="w-full max-w-md mx-auto bg-bg-tertiary/50 rounded-xl px-6 py-8 border border-bg-tertiary text-center">
-          <p className="text-text-muted text-base italic">Your line — speak from memory</p>
-        </div>
-      ) : (
-        <p
-          className={`
-            text-center leading-relaxed font-light max-w-2xl
-            ${!isMyLine && cueMode
-              ? 'text-3xl sm:text-4xl font-medium tracking-wide'
-              : 'text-2xl sm:text-3xl'
-            }
-          `}
-          style={{ color: isMyLine ? color : 'var(--color-text-primary)' }}
+      <div
+        style={{
+          flex: 1,
+          minWidth: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+        }}
+      >
+        {/* Character header */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'baseline',
+            justifyContent: 'space-between',
+            marginBottom: 10,
+            gap: 8,
+          }}
         >
-          {displayText}
-        </p>
-      )}
+          <div
+            style={{
+              fontFamily: 'var(--mono)',
+              fontSize: 11,
+              letterSpacing: '0.22em',
+              color,
+              textTransform: 'uppercase',
+            }}
+          >
+            {line.character}
+            {isMyLine && (
+              <span style={{ marginLeft: 8, color: 'var(--scarlet)' }}>● you</span>
+            )}
+            {!isMyLine && cueMode && (
+              <span style={{ marginLeft: 8, color: 'var(--ink-mute)' }}>cue</span>
+            )}
+          </div>
+          {showOffBookBox && (
+            <span
+              className="stamp"
+              style={{ color: 'var(--scarlet)', transform: 'rotate(2deg)', fontSize: 8 }}
+            >
+              off-book
+            </span>
+          )}
+        </div>
+
+        {/* Body */}
+        {showOffBookBox ? (
+          <div
+            style={{
+              border: '1.5px dashed var(--scarlet)',
+              borderRadius: 6,
+              padding: '20px 16px',
+              textAlign: 'center',
+              background: 'oklch(98% 0.04 25 / 0.4)',
+            }}
+          >
+            <div className="label" style={{ color: 'var(--scarlet-deep)' }}>From memory</div>
+            <p
+              className="font-serif"
+              style={{
+                fontStyle: 'italic',
+                color: 'var(--ink-mute)',
+                fontSize: 16,
+                marginTop: 6,
+              }}
+            >
+              your line — speak it
+            </p>
+          </div>
+        ) : cueText ? (
+          <p
+            className="display"
+            style={{
+              fontSize: 30,
+              lineHeight: 1.15,
+              color: 'var(--ink-soft)',
+              fontStyle: 'italic',
+            }}
+          >
+            {cueText}
+          </p>
+        ) : (
+          <p
+            className="display"
+            style={{
+              fontSize:
+                line.text.length > 110 ? 22 : line.text.length > 60 ? 26 : 30,
+              lineHeight: 1.18,
+              color: 'var(--ink)',
+              fontWeight: isMyLine ? 500 : 400,
+            }}
+          >
+            {line.text}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
