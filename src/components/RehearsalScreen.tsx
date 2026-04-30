@@ -368,6 +368,10 @@ export function RehearsalScreen({ config, onExit, installPrompt, onInstall }: Re
           myCharacter={config.myCharacter}
           characters={config.script.characters}
           onClose={() => setScriptViewOpen(false)}
+          onJumpToLine={(lineIndex) => {
+            rehearsal.goToLine(lineIndex);
+            setScriptViewOpen(false);
+          }}
         />
       )}
     </div>

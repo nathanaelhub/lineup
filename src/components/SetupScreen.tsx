@@ -523,6 +523,7 @@ export function SetupScreen({ script, onStart, onBack, isDarkMode, onToggleDark 
           characters={script.characters}
           onClose={() => setScriptViewOpen(false)}
           onCorrect={handleCorrect}
+          onJumpToLine={(lineIndex) => onStart(startConfig(lineIndex))}
         />
       )}
     </div>

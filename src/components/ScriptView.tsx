@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { ScriptLine } from '../types';
 import type { LineCorrection } from '../utils/storage';
 import { getCharacterColor } from '../utils/voiceMapper';
+
+type Mode = 'blackout' | 'highlight' | 'solo';
 
 interface ScriptViewProps {
   lines: ScriptLine[];
@@ -9,214 +11,588 @@ interface ScriptViewProps {
   characters: string[];
   onClose: () => void;
   onCorrect?: (lineIndex: number, correction: LineCorrection) => void;
+  onJumpToLine?: (lineIndex: number) => void;
 }
 
-export function ScriptView({ lines, myCharacter, characters, onClose, onCorrect }: ScriptViewProps) {
-  const [previewMode, setPreviewMode] = useState<'blackout' | 'highlight'>(() => {
-    return (localStorage.getItem('lineup-preview-mode') as 'blackout' | 'highlight') || 'blackout';
-  });
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+function getCueText(text: string, n = 3): string {
+  const words = text.trim().split(/\s+/);
+  if (words.length <= n) return text;
+  return '… ' + words.slice(-n).join(' ');
+}
 
-  const togglePreviewMode = () => {
-    const next = previewMode === 'blackout' ? 'highlight' : 'blackout';
-    localStorage.setItem('lineup-preview-mode', next);
-    setPreviewMode(next);
+export function ScriptView({
+  lines,
+  myCharacter,
+  characters,
+  onClose,
+  onCorrect,
+  onJumpToLine,
+}: ScriptViewProps) {
+  const [mode, setMode] = useState<Mode>(() => {
+    const saved = localStorage.getItem('lineup-preview-mode');
+    return saved === 'highlight' || saved === 'solo' ? (saved as Mode) : 'blackout';
+  });
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [search, setSearch] = useState('');
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const setModeAndPersist = (m: Mode) => {
+    localStorage.setItem('lineup-preview-mode', m);
+    setMode(m);
+  };
+
+  const myLineCount = useMemo(
+    () => lines.filter((l) => l.type === 'dialogue' && l.character === myCharacter).length,
+    [lines, myCharacter]
+  );
+  const totalDialogue = useMemo(
+    () => lines.filter((l) => l.type === 'dialogue').length,
+    [lines]
+  );
+
+  const scenes = useMemo(() => {
+    const out: { idx: number; text: string }[] = [];
+    lines.forEach((l, i) => {
+      if (l.type === 'scene_heading') out.push({ idx: i, text: l.text });
+    });
+    return out;
+  }, [lines]);
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return lines.map((l, i) => ({ l, i }));
+    const q = search.toLowerCase();
+    return lines
+      .map((l, i) => ({ l, i }))
+      .filter(({ l }) => {
+        if (l.text.toLowerCase().includes(q)) return true;
+        if (l.character && l.character.toLowerCase().includes(q)) return true;
+        return false;
+      });
+  }, [lines, search]);
+
+  const scrollToScene = (idx: number) => {
+    const el = scrollRef.current?.querySelector(`[data-line-idx="${idx}"]`);
+    if (el) (el as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-bg-primary flex flex-col">
+    <div
+      className="fade-in"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 50,
+        background: 'var(--paper)',
+        color: 'var(--ink)',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
       {/* Header */}
-      <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b border-bg-tertiary">
-        <div>
-          <h2 className="text-sm font-semibold text-text-primary">Script</h2>
-          <p className="text-xs text-text-muted mt-0.5">
-            {previewMode === 'blackout' ? 'Blacking out' : 'Highlighting'}:{' '}
-            <span className="font-medium text-text-secondary">{myCharacter}</span>
-            {onCorrect && <span className="ml-2 text-accent/80">· tap a line to correct it</span>}
-          </p>
+      <div
+        className="shrink-0 grid items-center safe-top"
+        style={{
+          paddingLeft: 18,
+          paddingRight: 18,
+          paddingBottom: 10,
+          gridTemplateColumns: '48px 1fr 48px',
+          gap: 8,
+        }}
+      >
+        <button onClick={onClose} aria-label="Close" className="icon-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="6" y1="6" x2="18" y2="18" />
+            <line x1="6" y1="18" x2="18" y2="6" />
+          </svg>
+        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+          <span className="ticket-no">
+            Preview · {myLineCount}/{totalDialogue} are yours
+          </span>
+          <span
+            className="display"
+            style={{
+              fontSize: 14,
+              fontStyle: 'italic',
+              maxWidth: 220,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {myCharacter}
+          </span>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={togglePreviewMode}
-            className="text-xs px-2.5 py-1 rounded-lg border border-bg-tertiary text-text-muted hover:text-text-primary transition-colors"
-          >
-            {previewMode === 'blackout' ? '⬛ Blackout' : '🟡 Highlight'}
-          </button>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+        {onJumpToLine ? (
+          <button onClick={() => onJumpToLine(0)} aria-label="Jump to start" className="icon-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="6 4 20 12 6 20 6 4" />
             </svg>
           </button>
+        ) : (
+          <span style={{ width: 40 }} />
+        )}
+      </div>
+
+      {/* Mode segmented control */}
+      <div style={{ padding: '0 18px 10px' }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr 1fr',
+            border: '1px solid var(--paper-line)',
+            borderRadius: 6,
+            overflow: 'hidden',
+          }}
+        >
+          {([
+            ['blackout', 'Blackout', 'Your lines redacted'],
+            ['highlight', 'Highlight', 'Marked in amber'],
+            ['solo', 'Solo', 'Only yours + cues'],
+          ] as Array<[Mode, string, string]>).map(([m, label, sub], i) => {
+            const active = mode === m;
+            return (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setModeAndPersist(m)}
+                style={{
+                  padding: '10px 6px',
+                  background: active ? 'var(--ink)' : 'var(--paper)',
+                  color: active ? 'var(--paper)' : 'var(--ink-soft)',
+                  fontFamily: 'var(--serif)',
+                  fontSize: 14,
+                  fontStyle: active ? 'italic' : 'normal',
+                  borderTop: 'none',
+                  borderRight: 'none',
+                  borderBottom: 'none',
+                  borderLeft: i === 0 ? 'none' : '1px solid var(--paper-line)',
+                  lineHeight: 1.1,
+                  cursor: 'pointer',
+                }}
+              >
+                <div>{label}</div>
+                <div
+                  style={{
+                    fontFamily: 'var(--mono)',
+                    fontSize: 8,
+                    marginTop: 2,
+                    opacity: active ? 0.7 : 0.55,
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    fontStyle: 'normal',
+                  }}
+                >
+                  {sub}
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Script scroll */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-0.5 font-mono text-sm">
-        {lines.map(line => (
-          <ScriptLineRow
-            key={line.lineIndex}
-            line={line}
+      {/* Search */}
+      <div style={{ padding: '0 18px 8px' }}>
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Find a line, cue, or character…"
+          style={{
+            width: '100%',
+            padding: '8px 12px',
+            background: 'var(--paper-deep)',
+            border: '1px solid var(--paper-line)',
+            borderRadius: 999,
+            fontFamily: 'var(--serif)',
+            fontSize: 13,
+            fontStyle: 'italic',
+            color: 'var(--ink)',
+            outline: 'none',
+          }}
+        />
+      </div>
+
+      {/* Scene rail */}
+      {scenes.length > 0 && (
+        <div
+          style={{
+            padding: '0 18px 8px',
+            display: 'flex',
+            gap: 6,
+            overflowX: 'auto',
+            flexShrink: 0,
+          }}
+        >
+          {scenes.map((s, i) => (
+            <button
+              key={s.idx}
+              type="button"
+              onClick={() => scrollToScene(s.idx)}
+              style={{
+                flexShrink: 0,
+                padding: '4px 10px',
+                borderRadius: 999,
+                border: '1px solid var(--paper-line)',
+                background: 'var(--paper)',
+                fontFamily: 'var(--mono)',
+                fontSize: 9,
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                color: 'var(--ink-soft)',
+                whiteSpace: 'nowrap',
+                cursor: 'pointer',
+              }}
+            >
+              § {i + 1} · {s.text.slice(0, 24)}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Body */}
+      <div
+        ref={scrollRef}
+        className="scroll"
+        style={{ flex: 1, padding: '8px 0 24px', background: 'var(--paper)' }}
+      >
+        {filtered.map(({ l, i }) => (
+          <ScriptRow
+            key={l.lineIndex ?? i}
+            line={l}
+            globalIdx={i}
+            mode={mode}
             myCharacter={myCharacter}
             characters={characters}
-            previewMode={previewMode}
-            isEditing={editingIndex === line.lineIndex}
+            editing={editingIdx === i}
             canEdit={!!onCorrect}
             onTap={() => {
               if (!onCorrect) return;
-              setEditingIndex(prev => prev === line.lineIndex ? null : line.lineIndex);
+              setEditingIdx((prev) => (prev === i ? null : i));
             }}
-            onCorrect={onCorrect ? (correction) => {
-              onCorrect(line.lineIndex, correction);
-            } : undefined}
+            onCorrect={onCorrect ? (correction) => onCorrect(l.lineIndex, correction) : undefined}
+            onJumpToLine={onJumpToLine}
           />
         ))}
-        <div className="h-16" />
+      </div>
+
+      {/* Footer */}
+      <div
+        className="shrink-0 safe-bottom"
+        style={{
+          paddingTop: 8,
+          paddingLeft: 18,
+          paddingRight: 18,
+          borderTop: '1px solid var(--paper-line)',
+          background: 'var(--paper-deep)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontFamily: 'var(--mono)',
+          fontSize: 9,
+          letterSpacing: '0.1em',
+          textTransform: 'uppercase',
+          color: 'var(--ink-mute)',
+        }}
+      >
+        <span>{onCorrect ? 'Tap any line to reassign' : 'Read-only preview'}</span>
+        <span>
+          {filtered.length} of {lines.length}
+        </span>
       </div>
     </div>
   );
 }
 
-function TypeBadge({ type }: { type: ScriptLine['type'] }) {
-  const label = type === 'scene_heading' ? 'HDG' : type === 'direction' ? 'DIR' : 'DLG';
-  const color = type === 'scene_heading'
-    ? 'text-purple-400 bg-purple-400/10'
-    : type === 'direction'
-    ? 'text-yellow-400 bg-yellow-400/10'
-    : 'text-blue-400 bg-blue-400/10';
-  return (
-    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${color} shrink-0 mt-0.5`}>
-      {label}
-    </span>
-  );
-}
-
-function ScriptLineRow({
-  line, myCharacter, characters, previewMode, isEditing, canEdit, onTap, onCorrect,
+function ScriptRow({
+  line,
+  globalIdx,
+  mode,
+  myCharacter,
+  characters,
+  editing,
+  canEdit,
+  onTap,
+  onCorrect,
+  onJumpToLine,
 }: {
   line: ScriptLine;
+  globalIdx: number;
+  mode: Mode;
   myCharacter: string;
   characters: string[];
-  previewMode: 'blackout' | 'highlight';
-  isEditing: boolean;
+  editing: boolean;
   canEdit: boolean;
   onTap: () => void;
   onCorrect?: (correction: LineCorrection) => void;
+  onJumpToLine?: (lineIndex: number) => void;
 }) {
-  const isMe = line.character === myCharacter;
-  const color = line.character ? getCharacterColor(line.character, characters) : undefined;
-  const barWidth = Math.min(100, Math.max(30, Math.round(line.text.length / 80 * 100)));
+  const isMe = line.type === 'dialogue' && line.character === myCharacter;
+  const color = line.character ? getCharacterColor(line.character, characters) : 'var(--ink-soft)';
 
-  const lineBody = () => {
-    if (line.type === 'scene_heading') {
-      return (
-        <p className="text-xs font-bold uppercase tracking-widest text-text-muted/50 pt-2 pb-0.5 flex-1">
-          {line.text}
-        </p>
-      );
-    }
-    if (line.type === 'direction') {
-      return (
-        <p className="text-text-muted italic text-xs px-4 flex-1">
-          ({line.text})
-        </p>
-      );
-    }
-    return (
-      <div className="space-y-0.5 flex-1">
-        <p className="text-[11px] font-bold tracking-wider" style={{ color }}>
-          {line.character}
-        </p>
-        {isMe ? (
-          previewMode === 'blackout' ? (
-            <div
-              className="h-5 rounded-sm bg-text-primary/90"
-              style={{ width: `${barWidth}%` }}
-              aria-label="[your line]"
-            />
-          ) : (
-            <p className="text-text-primary leading-relaxed bg-yellow-400/20 rounded px-1">
-              {line.text}
-            </p>
-          )
-        ) : (
-          <p className="text-text-secondary leading-relaxed">{line.text}</p>
-        )}
-      </div>
-    );
-  };
+  // Solo mode skips non-dialogue rows
+  if (mode === 'solo' && line.type !== 'dialogue') return null;
 
   return (
-    <div className={`rounded-xl transition-colors ${isEditing ? 'bg-bg-secondary' : canEdit ? 'hover:bg-bg-secondary/50 active:bg-bg-secondary' : ''}`}>
-      {/* Row — tappable */}
+    <div
+      data-line-idx={globalIdx}
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '36px 1fr',
+        padding: '4px 18px',
+        background: editing ? 'var(--paper-deep)' : 'transparent',
+        transition: 'background 150ms',
+      }}
+    >
+      <div
+        style={{
+          fontFamily: 'var(--mono)',
+          fontSize: 9,
+          color: 'var(--ink-mute)',
+          paddingTop: 6,
+          opacity: 0.6,
+          borderRight: '1px solid var(--paper-line)',
+          marginRight: 8,
+        }}
+      >
+        {String(globalIdx + 1).padStart(3, '0')}
+      </div>
+
       <button
+        type="button"
         onClick={onTap}
         disabled={!canEdit}
-        className="w-full text-left px-3 py-2 flex items-start gap-2"
+        style={{
+          textAlign: 'left',
+          padding: '4px 0',
+          background: 'none',
+          border: 'none',
+          cursor: canEdit ? 'pointer' : 'default',
+          color: 'inherit',
+          font: 'inherit',
+          width: '100%',
+        }}
       >
-        {canEdit && <TypeBadge type={line.type} />}
-        {lineBody()}
-        {canEdit && (
-          <svg
-            width="14" height="14"
-            viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-            className={`shrink-0 mt-0.5 transition-transform ${isEditing ? 'rotate-180 text-accent' : 'text-text-muted/40'}`}
+        {line.type === 'scene_heading' && (
+          <div
+            style={{
+              fontFamily: 'var(--mono)',
+              fontSize: 10,
+              letterSpacing: '0.2em',
+              textTransform: 'uppercase',
+              color: 'var(--ink-mute)',
+              padding: '12px 0 4px',
+              borderBottom: '1px solid var(--paper-line)',
+            }}
           >
-            <polyline points="6 9 12 15 18 9"/>
-          </svg>
+            § {line.text}
+          </div>
+        )}
+
+        {line.type === 'direction' && (
+          <p
+            style={{
+              fontFamily: 'var(--serif)',
+              fontStyle: 'italic',
+              fontSize: 13,
+              color: 'var(--ink-mute)',
+              paddingLeft: 16,
+              lineHeight: 1.4,
+            }}
+          >
+            ({line.text})
+          </p>
+        )}
+
+        {line.type === 'dialogue' && (
+          <div>
+            <div
+              style={{
+                fontFamily: 'var(--mono)',
+                fontSize: 10,
+                letterSpacing: '0.2em',
+                color,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                textTransform: 'uppercase',
+              }}
+            >
+              {line.character}
+              {isMe && (
+                <span
+                  className="stamp"
+                  style={{
+                    color: 'var(--scarlet)',
+                    fontSize: 7,
+                    padding: '1px 5px',
+                    transform: 'rotate(0)',
+                  }}
+                >
+                  YOU
+                </span>
+              )}
+            </div>
+
+            {isMe && mode === 'blackout' ? (
+              <div style={{ marginTop: 4 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {line.text.split(/\s+/).map((w, j) => (
+                    <span
+                      key={j}
+                      style={{
+                        display: 'inline-block',
+                        height: 14,
+                        width: Math.max(18, w.length * 6),
+                        background: 'var(--ink)',
+                        borderRadius: 2,
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : isMe && mode === 'highlight' ? (
+              <p
+                style={{
+                  fontFamily: 'var(--serif)',
+                  fontSize: 14,
+                  lineHeight: 1.45,
+                  marginTop: 2,
+                  background:
+                    'linear-gradient(180deg, transparent 55%, var(--amber) 55%, var(--amber) 95%, transparent 95%)',
+                  padding: '0 2px',
+                  display: 'inline',
+                  color: 'var(--ink)',
+                }}
+              >
+                {line.text}
+              </p>
+            ) : !isMe && mode === 'solo' ? (
+              <p
+                style={{
+                  fontFamily: 'var(--serif)',
+                  fontStyle: 'italic',
+                  fontSize: 13,
+                  lineHeight: 1.4,
+                  color: 'var(--ink-mute)',
+                  marginTop: 2,
+                }}
+              >
+                {getCueText(line.text)}
+              </p>
+            ) : (
+              <p
+                style={{
+                  fontFamily: 'var(--serif)',
+                  fontSize: 14,
+                  lineHeight: 1.45,
+                  marginTop: 2,
+                  color: 'var(--ink)',
+                  fontWeight: isMe ? 500 : 400,
+                }}
+              >
+                {line.text}
+              </p>
+            )}
+          </div>
         )}
       </button>
 
-      {/* Edit panel */}
-      {isEditing && onCorrect && (
-        <div className="px-3 pb-3 space-y-3">
-          {/* Type picker */}
-          <div className="space-y-1.5">
-            <p className="text-[10px] uppercase tracking-wider text-text-muted">Change type to</p>
-            <div className="grid grid-cols-3 gap-2">
-              {(['dialogue', 'direction', 'scene_heading'] as const).map(t => (
+      {/* Inline edit sheet */}
+      {editing && onCorrect && (
+        <>
+          <div />
+          <div
+            style={{
+              margin: '6px 0 8px',
+              padding: 10,
+              border: '1px dashed var(--paper-line)',
+              borderRadius: 6,
+              background: 'var(--paper)',
+            }}
+          >
+            <div className="label" style={{ marginBottom: 6 }}>Reassign · or change type</div>
+
+            {/* Character picker */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+              {characters.map((c) => (
                 <button
-                  key={t}
-                  onClick={() => onCorrect({
-                    type: t,
-                    character: t === 'dialogue' ? (line.character ?? characters[0]) : undefined,
-                  })}
-                  className={`py-2.5 rounded-xl text-xs font-semibold transition-colors
-                    ${line.type === t
-                      ? 'bg-accent text-white'
-                      : 'bg-bg-tertiary text-text-muted hover:text-text-primary active:bg-bg-tertiary/80'
-                    }`}
+                  key={c}
+                  type="button"
+                  onClick={() =>
+                    onCorrect({ type: 'dialogue', character: c })
+                  }
+                  style={{
+                    padding: '4px 8px',
+                    borderRadius: 999,
+                    border: '1px solid var(--paper-line)',
+                    background: line.character === c ? 'var(--ink)' : 'var(--paper)',
+                    color: line.character === c ? 'var(--paper)' : 'var(--ink-soft)',
+                    fontFamily: 'var(--mono)',
+                    fontSize: 9,
+                    letterSpacing: '0.12em',
+                    cursor: 'pointer',
+                  }}
                 >
-                  {t === 'scene_heading' ? 'Heading' : t === 'direction' ? 'Direction' : 'Dialogue'}
+                  {c}
                 </button>
               ))}
             </div>
-          </div>
 
-          {/* Character picker — only for dialogue */}
-          {line.type === 'dialogue' && (
-            <div className="space-y-1.5">
-              <p className="text-[10px] uppercase tracking-wider text-text-muted">Assign to character</p>
-              <div className="flex flex-wrap gap-2">
-                {characters.map(char => (
-                  <button
-                    key={char}
-                    onClick={() => onCorrect({ type: 'dialogue', character: char })}
-                    className={`px-4 py-2 rounded-xl text-xs font-semibold transition-colors
-                      ${line.character === char
-                        ? 'bg-accent text-white'
-                        : 'bg-bg-tertiary text-text-muted hover:text-text-primary active:bg-bg-tertiary/80'
-                      }`}
-                  >
-                    {char}
-                  </button>
-                ))}
-              </div>
+            {/* Type picker */}
+            <div style={{ display: 'flex', gap: 4 }}>
+              {(['dialogue', 'direction', 'scene_heading'] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() =>
+                    onCorrect({
+                      type: t,
+                      character:
+                        t === 'dialogue' ? (line.character ?? characters[0]) : undefined,
+                    })
+                  }
+                  style={{
+                    flex: 1,
+                    padding: '5px 6px',
+                    borderRadius: 4,
+                    border: '1px solid var(--paper-line)',
+                    background: line.type === t ? 'var(--scarlet)' : 'var(--paper-deep)',
+                    color: line.type === t ? 'var(--paper)' : 'var(--ink-mute)',
+                    fontFamily: 'var(--mono)',
+                    fontSize: 9,
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {t === 'scene_heading' ? 'Scene' : t}
+                </button>
+              ))}
             </div>
-          )}
-        </div>
+
+            {onJumpToLine && line.type === 'dialogue' && (
+              <button
+                type="button"
+                onClick={() => onJumpToLine(line.lineIndex)}
+                style={{
+                  width: '100%',
+                  marginTop: 8,
+                  padding: '6px 8px',
+                  borderRadius: 999,
+                  background: 'var(--ink)',
+                  color: 'var(--paper)',
+                  fontFamily: 'var(--serif)',
+                  fontSize: 12,
+                  fontStyle: 'italic',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                Start rehearsal from line {globalIdx + 1} →
+              </button>
+            )}
+          </div>
+        </>
       )}
     </div>
   );
