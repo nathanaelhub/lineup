@@ -329,8 +329,8 @@ function ScriptRow({
   const isMe = line.type === 'dialogue' && line.character === myCharacter;
   const color = line.character ? getCharacterColor(line.character, characters) : 'var(--ink-soft)';
 
-  // Solo mode skips non-dialogue rows
-  if (mode === 'solo' && line.type !== 'dialogue') return null;
+  // Solo mode skips direction rows; scene headings kept as invisible scroll anchors
+  if (mode === 'solo' && line.type === 'direction') return null;
 
   return (
     <div
@@ -374,7 +374,7 @@ function ScriptRow({
       >
         {line.type === 'scene_heading' && (
           <div
-            style={{
+            style={mode === 'solo' ? { height: 0, overflow: 'hidden' } : {
               fontFamily: 'var(--mono)',
               fontSize: 10,
               letterSpacing: '0.2em',
@@ -384,7 +384,7 @@ function ScriptRow({
               borderBottom: '1px solid var(--paper-line)',
             }}
           >
-            § {line.text}
+            {mode !== 'solo' && `§ ${line.text}`}
           </div>
         )}
 
@@ -451,20 +451,21 @@ function ScriptRow({
                 </div>
               </div>
             ) : isMe && mode === 'highlight' ? (
-              <p
-                style={{
-                  fontFamily: 'var(--serif)',
-                  fontSize: 14,
-                  lineHeight: 1.45,
-                  marginTop: 2,
-                  background:
-                    'linear-gradient(180deg, transparent 55%, var(--amber) 55%, var(--amber) 95%, transparent 95%)',
-                  padding: '0 2px',
-                  display: 'inline',
-                  color: 'var(--ink)',
-                }}
-              >
-                {line.text}
+              <p style={{ marginTop: 2, lineHeight: 1.45 }}>
+                <span
+                  style={{
+                    fontFamily: 'var(--serif)',
+                    fontSize: 14,
+                    background:
+                      'linear-gradient(180deg, transparent 55%, var(--amber) 55%, var(--amber) 95%, transparent 95%)',
+                    padding: '0 2px',
+                    WebkitBoxDecorationBreak: 'clone',
+                    boxDecorationBreak: 'clone',
+                    color: 'var(--ink)',
+                  }}
+                >
+                  {line.text}
+                </span>
               </p>
             ) : !isMe && mode === 'solo' ? (
               <p
