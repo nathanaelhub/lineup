@@ -456,9 +456,9 @@ function ScriptRow({
                   style={{
                     fontFamily: 'var(--serif)',
                     fontSize: 14,
-                    background:
-                      'linear-gradient(180deg, transparent 55%, var(--amber) 55%, var(--amber) 95%, transparent 95%)',
-                    padding: '0 2px',
+                    background: 'color-mix(in oklch, var(--amber) 55%, transparent)',
+                    padding: '2px 3px',
+                    borderRadius: 2,
                     WebkitBoxDecorationBreak: 'clone',
                     boxDecorationBreak: 'clone',
                     color: 'var(--ink)',
