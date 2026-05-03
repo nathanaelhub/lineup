@@ -84,4 +84,5 @@ export interface SavedScript {
   rawText: string;
   parsedScript: ParsedScript;
   savedAt: number;
+  archived?: boolean;
 }

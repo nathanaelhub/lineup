@@ -5,7 +5,7 @@ interface BeforeInstallPromptEvent extends Event {
 }
 import type { AppScreen, ParsedScript, SessionConfig, SavedScript } from './types';
 import { parseScript } from './lib/scriptParser';
-import { getSavedScripts, saveScript, deleteScript } from './utils/storage';
+import { getSavedScripts, saveScript, deleteScript, archiveScript, restoreScript } from './utils/storage';
 import { HomeScreen } from './components/HomeScreen';
 import { SetupScreen } from './components/SetupScreen';
 import { RehearsalScreen } from './components/RehearsalScreen';
@@ -66,6 +66,16 @@ function App() {
     setSavedScripts(getSavedScripts());
   }, []);
 
+  const handleArchiveSaved = useCallback((id: string) => {
+    archiveScript(id);
+    setSavedScripts(getSavedScripts());
+  }, []);
+
+  const handleRestoreSaved = useCallback((id: string) => {
+    restoreScript(id);
+    setSavedScripts(getSavedScripts());
+  }, []);
+
   const handleStartRehearsal = useCallback((config: SessionConfig) => {
     setSessionConfig(config);
     setScreen('rehearsal');
@@ -90,6 +100,8 @@ function App() {
           onUpload={handleUpload}
           onLoadSaved={handleLoadSaved}
           onDeleteSaved={handleDeleteSaved}
+          onArchiveSaved={handleArchiveSaved}
+          onRestoreSaved={handleRestoreSaved}
           isDarkMode={isDarkMode}
           onToggleDark={toggleDarkMode}
         />

@@ -59,6 +59,16 @@ export function deleteScript(id: string): void {
   localStorage.setItem(SCRIPTS_KEY, JSON.stringify(scripts));
 }
 
+export function archiveScript(id: string): void {
+  const scripts = getSavedScripts().map(s => s.id === id ? { ...s, archived: true } : s);
+  localStorage.setItem(SCRIPTS_KEY, JSON.stringify(scripts));
+}
+
+export function restoreScript(id: string): void {
+  const scripts = getSavedScripts().map(s => s.id === id ? { ...s, archived: false } : s);
+  localStorage.setItem(SCRIPTS_KEY, JSON.stringify(scripts));
+}
+
 // ── Positions ─────────────────────────────────────────────────────────────────
 
 function getPositions(): Record<string, SavedPosition> {
