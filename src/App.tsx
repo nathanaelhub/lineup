@@ -10,6 +10,17 @@ import { HomeScreen } from './components/HomeScreen';
 import { SetupScreen } from './components/SetupScreen';
 import { RehearsalScreen } from './components/RehearsalScreen';
 
+// Heuristic: a PDF with broken font encoding produces extracted text that
+// contains almost no recognisable English words. Check for a handful of
+// common words — if fewer than two appear the text is likely garbled.
+function looksGarbled(text: string): boolean {
+  if (text.length < 200) return false;
+  const sample = text.toLowerCase().slice(0, 3000);
+  const commonWords = ['the', 'and', 'you', 'that', 'was', 'for', 'are', 'with', 'not', 'have', 'this', 'but'];
+  const found = commonWords.filter(w => sample.includes(w));
+  return found.length < 2;
+}
+
 function App() {
   const [screen, setScreen] = useState<AppScreen>('home');
   const [parsedScript, setParsedScript] = useState<ParsedScript | null>(null);
@@ -45,7 +56,14 @@ function App() {
   const handleUpload = useCallback((text: string, filename: string) => {
     const parsed = parseScript(text);
     if (parsed.characters.length === 0) {
-      alert('No characters detected in this script. Make sure character names are in ALL CAPS.');
+      if (looksGarbled(text)) {
+        alert(
+          'This PDF has a font encoding issue that prevents text from being read.\n\n' +
+          'To fix it: open the file in Preview, then go to File → Export as PDF and save a new copy. Upload that copy instead.'
+        );
+      } else {
+        alert('No characters detected in this script. Make sure character names are in ALL CAPS.');
+      }
       return;
     }
     parsed.title = filename.replace(/\.\w+$/, '') || parsed.title;
