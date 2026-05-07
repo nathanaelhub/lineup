@@ -34,6 +34,7 @@ export function ScriptView({
   });
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [search, setSearch] = useState('');
+  const [controlsVisible, setControlsVisible] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const setModeAndPersist = (m: Mode) => {
@@ -134,126 +135,142 @@ export function ScriptView({
         )}
       </div>
 
-      {/* Mode segmented control */}
-      <div style={{ padding: '0 18px 10px' }}>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr 1fr',
-            border: '1px solid var(--paper-line)',
-            borderRadius: 6,
-            overflow: 'hidden',
-          }}
-        >
-          {([
-            ['blackout', 'Blackout', 'Your lines redacted'],
-            ['highlight', 'Highlight', 'Marked in amber'],
-            ['solo', 'Solo', 'Only yours + cues'],
-          ] as Array<[Mode, string, string]>).map(([m, label, sub], i) => {
-            const active = mode === m;
-            return (
+      {/* Collapsible controls: hide when scrolled, reappear at top */}
+      <div
+        style={{
+          overflow: 'hidden',
+          maxHeight: controlsVisible ? 400 : 0,
+          opacity: controlsVisible ? 1 : 0,
+          transition: 'max-height 280ms ease, opacity 220ms ease',
+          pointerEvents: controlsVisible ? 'auto' : 'none',
+          flexShrink: 0,
+        }}
+      >
+        {/* Mode segmented control */}
+        <div style={{ padding: '0 18px 10px' }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr 1fr',
+              border: '1px solid var(--paper-line)',
+              borderRadius: 6,
+              overflow: 'hidden',
+            }}
+          >
+            {([
+              ['blackout', 'Blackout', 'Your lines redacted'],
+              ['highlight', 'Highlight', 'Marked in amber'],
+              ['solo', 'Solo', 'Only yours + cues'],
+            ] as Array<[Mode, string, string]>).map(([m, label, sub], i) => {
+              const active = mode === m;
+              return (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setModeAndPersist(m)}
+                  style={{
+                    padding: '10px 6px',
+                    background: active ? 'var(--ink)' : 'var(--paper)',
+                    color: active ? 'var(--paper)' : 'var(--ink-soft)',
+                    fontFamily: 'var(--serif)',
+                    fontSize: 14,
+                    fontStyle: active ? 'italic' : 'normal',
+                    borderTop: 'none',
+                    borderRight: 'none',
+                    borderBottom: 'none',
+                    borderLeft: i === 0 ? 'none' : '1px solid var(--paper-line)',
+                    lineHeight: 1.1,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div>{label}</div>
+                  <div
+                    style={{
+                      fontFamily: 'var(--mono)',
+                      fontSize: 8,
+                      marginTop: 2,
+                      opacity: active ? 0.7 : 0.55,
+                      letterSpacing: '0.08em',
+                      textTransform: 'uppercase',
+                      fontStyle: 'normal',
+                    }}
+                  >
+                    {sub}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Search */}
+        <div style={{ padding: '0 18px 8px' }}>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Find a line, cue, or character…"
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              background: 'var(--paper-deep)',
+              border: '1px solid var(--paper-line)',
+              borderRadius: 999,
+              fontFamily: 'var(--serif)',
+              fontSize: 13,
+              fontStyle: 'italic',
+              color: 'var(--ink)',
+              outline: 'none',
+            }}
+          />
+        </div>
+
+        {/* Scene rail */}
+        {scenes.length > 0 && (
+          <div
+            style={{
+              padding: '0 18px 8px',
+              display: 'flex',
+              gap: 6,
+              overflowX: 'auto',
+              flexShrink: 0,
+            }}
+          >
+            {scenes.map((s, i) => (
               <button
-                key={m}
+                key={s.idx}
                 type="button"
-                onClick={() => setModeAndPersist(m)}
+                onClick={() => scrollToScene(s.idx)}
                 style={{
-                  padding: '10px 6px',
-                  background: active ? 'var(--ink)' : 'var(--paper)',
-                  color: active ? 'var(--paper)' : 'var(--ink-soft)',
-                  fontFamily: 'var(--serif)',
-                  fontSize: 14,
-                  fontStyle: active ? 'italic' : 'normal',
-                  borderTop: 'none',
-                  borderRight: 'none',
-                  borderBottom: 'none',
-                  borderLeft: i === 0 ? 'none' : '1px solid var(--paper-line)',
-                  lineHeight: 1.1,
+                  flexShrink: 0,
+                  padding: '4px 10px',
+                  borderRadius: 999,
+                  border: '1px solid var(--paper-line)',
+                  background: 'var(--paper)',
+                  fontFamily: 'var(--mono)',
+                  fontSize: 9,
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase',
+                  color: 'var(--ink-soft)',
+                  whiteSpace: 'nowrap',
                   cursor: 'pointer',
                 }}
               >
-                <div>{label}</div>
-                <div
-                  style={{
-                    fontFamily: 'var(--mono)',
-                    fontSize: 8,
-                    marginTop: 2,
-                    opacity: active ? 0.7 : 0.55,
-                    letterSpacing: '0.08em',
-                    textTransform: 'uppercase',
-                    fontStyle: 'normal',
-                  }}
-                >
-                  {sub}
-                </div>
+                § {i + 1} · {s.text.slice(0, 24)}
               </button>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
-
-      {/* Search */}
-      <div style={{ padding: '0 18px 8px' }}>
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Find a line, cue, or character…"
-          style={{
-            width: '100%',
-            padding: '8px 12px',
-            background: 'var(--paper-deep)',
-            border: '1px solid var(--paper-line)',
-            borderRadius: 999,
-            fontFamily: 'var(--serif)',
-            fontSize: 13,
-            fontStyle: 'italic',
-            color: 'var(--ink)',
-            outline: 'none',
-          }}
-        />
-      </div>
-
-      {/* Scene rail */}
-      {scenes.length > 0 && (
-        <div
-          style={{
-            padding: '0 18px 8px',
-            display: 'flex',
-            gap: 6,
-            overflowX: 'auto',
-            flexShrink: 0,
-          }}
-        >
-          {scenes.map((s, i) => (
-            <button
-              key={s.idx}
-              type="button"
-              onClick={() => scrollToScene(s.idx)}
-              style={{
-                flexShrink: 0,
-                padding: '4px 10px',
-                borderRadius: 999,
-                border: '1px solid var(--paper-line)',
-                background: 'var(--paper)',
-                fontFamily: 'var(--mono)',
-                fontSize: 9,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                color: 'var(--ink-soft)',
-                whiteSpace: 'nowrap',
-                cursor: 'pointer',
-              }}
-            >
-              § {i + 1} · {s.text.slice(0, 24)}
-            </button>
-          ))}
-        </div>
-      )}
 
       {/* Body */}
       <div
         ref={scrollRef}
         className="scroll"
         style={{ flex: 1, padding: '8px 0 24px', background: 'var(--paper)' }}
+        onScroll={(e) => {
+          const top = (e.currentTarget as HTMLDivElement).scrollTop;
+          setControlsVisible(top < 60);
+        }}
       >
         {filtered.map(({ l, i }) => (
           <ScriptRow
@@ -450,7 +467,7 @@ function ScriptRow({
                   ))}
                 </div>
               </div>
-            ) : isMe && mode === 'highlight' ? (
+            ) : isMe && (mode === 'highlight' || mode === 'solo') ? (
               <p style={{ marginTop: 2, lineHeight: 1.45 }}>
                 <span
                   style={{

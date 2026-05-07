@@ -77,8 +77,9 @@ function looksLikeAction(text: string): boolean {
   if (!text) return false;
   // Starts with lowercase letter → definitely action/continuation prose
   if (/^[a-z]/.test(text)) return true;
-  // Very long line is probably action (8+ words)
-  if (text.split(/\s+/).length > 8) return true;
+  // Very long line is probably action (20+ words — raised from 8 to avoid false
+  // positives on multi-sentence speeches that happen to exceed 8 words)
+  if (text.split(/\s+/).length > 20) return true;
   return false;
 }
 
@@ -233,8 +234,10 @@ export function parseScript(rawText: string): ParsedScript {
           break;
         }
 
-        // In indented mode: action-level line ends the dialogue block
-        if (isIndented && classifyByIndent(nextIndent) === 'action') break;
+        // In indented mode: action-level line ends the dialogue block, unless
+        // it starts with lowercase/dash — those are word-wrap continuations from
+        // PDF generators (e.g. fpdf2 multi_cell resets x to left margin).
+        if (isIndented && classifyByIndent(nextIndent) === 'action' && !/^[a-z\-–]/.test(nextLine)) break;
 
         // Another character name or scene heading ends the block
         const nextNameClean = nextLine.replace(/[:–—-]\s*$/, '').trim();
@@ -266,9 +269,10 @@ export function parseScript(rawText: string): ParsedScript {
           continue;
         }
 
-        // In plain text mode: stop collecting if a line looks like action prose
-        // (long line starting uppercase – likely a narrative sentence, not dialogue)
-        if (!isIndented && looksLikeAction(nextLine) && dialogueLines.length > 0) break;
+        // In plain text mode: stop collecting if a line looks like a new action
+        // paragraph. Lowercase lines are word-wrap continuations of the current
+        // speech — let them through rather than breaking the block early.
+        if (!isIndented && looksLikeAction(nextLine) && dialogueLines.length > 0 && !/^[a-z]/.test(nextLine)) break;
 
         // Strip any leading parenthetical stage direction from the start of a dialogue line.
         // Handles page-continuation markers like (CONT'D), (MORE), and inline acting notes
